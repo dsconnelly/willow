@@ -1,3 +1,3 @@
-from ._mima import process
+from ._mima import preprocess
 
-__all__ = ['process']
+__all__ = ['preprocess']
