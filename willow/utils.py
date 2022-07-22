@@ -22,7 +22,7 @@ def parse_func(func):
     for param in params:
         param['help'] = ' '.join(param['help'])
 
-    return func.__name__, help_str, params
+    return func.__name__.replace('_', '-'), help_str, params
 
 def _get_type(type_name):
     try:
