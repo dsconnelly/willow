@@ -1,3 +1,4 @@
+import logging
 import os
 
 import joblib
@@ -8,9 +9,10 @@ from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.pipeline import make_pipeline
 
-from ._utils import ScalingWrapper, standardize, timer
+from ._utils import ScalingWrapper, logs, standardize, times
 
-@timer
+@logs
+@times
 def train_forest(data_dir, model_dir, kind):
     """
     Train a boosted or random forest.
@@ -43,24 +45,25 @@ def train_forest(data_dir, model_dir, kind):
     elif kind == 'boosted':
         model_class = BoostedForestRegressor
         
-        kwargs['verbose'] = True
+        kwargs['learning_rate'] = 0.05
         kwargs['val_size'] = 0.2
         kwargs['patience'] = 20
         kwargs['threshold'] = 0.01
+        kwargs['verbose'] = True
         
     else:
         raise ValueError(f'Unknown forest type: {kind}')
         
-    print(f'Loaded {X.shape[0]} samples.')
-    print(f'Training a {model_class.__name__}.')
+    logging.info(f'Loaded {X.shape[0]} samples.')
+    logging.info(f'Training a {model_class.__name__}.')
     
     if False and 'pca' in model_dir:
-        print('Using PCA in training pipeline.')
+        logging.info('Using PCA in training pipeline.')
         
         estimator_class = model_class
         def model_class(**kwargs):
             return make_pipeline(
-                PCA(n_components=10),
+                PCA(n_components=40),
                 estimator_class(**kwargs)
             )
         

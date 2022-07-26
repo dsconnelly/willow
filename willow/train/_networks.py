@@ -1,4 +1,5 @@
 import os
+import logging
 import time
 
 from importlib import import_module
@@ -9,9 +10,10 @@ import torch, torch.nn as nn
 
 from torch.utils.data import DataLoader, TensorDataset, random_split
 
-from ._utils import ScalingWrapper, standardize, timer
+from ._utils import ScalingWrapper, logs, standardize, times
 
-@timer
+@logs
+@times
 def train_network(data_dir, model_dir, class_name):
     """
     Train a neural network.
@@ -48,8 +50,8 @@ def train_network(data_dir, model_dir, class_name):
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     
-    print(f'Loaded {n_samples} samples, using {m} for training.')
-    print(f'Training a {class_name} with {n_params} parameters.')
+    logging.info(f'Loaded {n_samples} samples, using {m} for training.')
+    logging.info(f'Training a {class_name} with {n_params} parameters.')
     
     dataset = TensorDataset(X_tr, Y_tr_scaled)
     loader = DataLoader(dataset, batch_size=1024, shuffle=True)
@@ -57,7 +59,7 @@ def train_network(data_dir, model_dir, class_name):
     def loss_func(Y, output):
         return ((Y - output) ** 2).mean()
     
-    max_epochs = 500
+    max_epochs = 20
     max_hours = 48
     
     i, training_start = 1, time.time()
@@ -70,11 +72,11 @@ def train_network(data_dir, model_dir, class_name):
   
         with torch.no_grad():
             loss = loss_func(Y_va_scaled, model(X_va)).item()
-            print(f'Epoch {i}: validation loss is {loss:3f}')
+            logging.info(f'Epoch {i}: validation loss is {loss:3f}')
         
         hours = (time.time() - training_start) / 3600
         if hours > max_hours or i == max_epochs:
-            print(f'Terminating after {i} epochs.')
+            logging.info(f'Terminating after {i} epochs.')
             model = ScalingWrapper(model, means, stds)
             joblib.dump(model, os.path.join(model_dir, 'model.pkl'))
             
