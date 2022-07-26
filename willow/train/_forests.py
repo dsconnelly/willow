@@ -54,7 +54,7 @@ def train_forest(data_dir, model_dir, kind):
     print(f'Loaded {X.shape[0]} samples.')
     print(f'Training a {model_class.__name__}.')
     
-    if 'pca' in model_dir:
+    if False and 'pca' in model_dir:
         print('Using PCA in training pipeline.')
         
         estimator_class = model_class
@@ -67,6 +67,4 @@ def train_forest(data_dir, model_dir, kind):
     model = model_class(**kwargs).fit(X, Y_scaled)
     model = ScalingWrapper(model, means, stds)
     joblib.dump(model, os.path.join(model_dir, 'model.pkl'))
-        
-        
     

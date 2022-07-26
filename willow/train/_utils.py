@@ -1,3 +1,4 @@
+import functools
 import time
 
 import numpy as np
@@ -5,10 +6,8 @@ import torch, torch.nn as nn
 
 class ScalingWrapper:
     def __init__(self, model, means, stds):
-        self.model = getattr(model, 'predict', model)
-        self.is_torch = isinstance(model, nn.Module)
-        
-        if self.is_torch:
+        self.model = model        
+        if self._is_torch():
             means = means.numpy()
             stds = stds.numpy()
         
@@ -16,16 +15,19 @@ class ScalingWrapper:
         self.stds = stds
         
     def predict(self, X):
-        if self.is_torch:
-            X = torch.tensor(X)
-            
         with torch.no_grad():
-            out = self.model(X)
+            out = self._apply(X)
             
-        if self.is_torch:
-            out = out.numpy()
-            
-        return self.means + self.stds * out
+        return self.means + self.stds * out    
+    
+    def _apply(self, X):
+        if self._is_torch():
+            return self.model(torch.tensor(X)).numpy()
+        
+        return self.model.predict(X)
+    
+    def _is_torch(self):
+        return isinstance(self.model, nn.Module)
 
 def standardize(A, means=None, stds=None, return_stats=False):
     if means is None:
@@ -47,6 +49,7 @@ def standardize(A, means=None, stds=None, return_stats=False):
     return out
 
 def timer(func):
+    @functools.wraps(func)
     def timed_func(*args, **kwargs):
         start = time.time()
         output = func(*args, **kwargs)
@@ -55,8 +58,5 @@ def timer(func):
         print(f'{func.__name__} took {runtime:.2f} seconds.')
         
         return output
-    
-    timed_func.__name__ = func.__name__
-    timed_func.__doc__ = func.__doc__
     
     return timed_func
