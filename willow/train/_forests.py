@@ -35,7 +35,7 @@ def train_forest(data_dir, model_dir, kind):
     kwargs = {
         'n_estimators' : 300,
         'max_depth' : 15,
-        'max_samples' : 0.2,
+        'max_samples' : 0.3,
         'max_features' : 0.5
     }
     
@@ -45,7 +45,7 @@ def train_forest(data_dir, model_dir, kind):
     elif kind == 'boosted':
         model_class = BoostedForestRegressor
         
-        kwargs['learning_rate'] = 0.05
+        kwargs['learning_rate'] = 0.08
         kwargs['val_size'] = 0.2
         kwargs['patience'] = 20
         kwargs['threshold'] = 0.01
@@ -57,7 +57,13 @@ def train_forest(data_dir, model_dir, kind):
     logging.info(f'Loaded {X.shape[0]} samples.')
     logging.info(f'Training a {model_class.__name__}.')
     
-    if False and 'pca' in model_dir:
+    if 'shear' in model_dir:
+        logging.info('Using shear instead of buoyancy frequency.')
+        
+        shear = X[:, :39] - X[:, 1:40]
+        X = np.hstack((X[:, :40], shear, X[:, -2:]))
+    
+    if 'pca' in model_dir:
         logging.info('Using PCA in training pipeline.')
         
         estimator_class = model_class

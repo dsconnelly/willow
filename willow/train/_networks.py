@@ -59,8 +59,8 @@ def train_network(data_dir, model_dir, class_name):
     def loss_func(Y, output):
         return ((Y - output) ** 2).mean()
     
-    max_epochs = 20
-    max_hours = 48
+    max_epochs = 40
+    max_hours = 16
     
     i, training_start = 1, time.time()
     while True:

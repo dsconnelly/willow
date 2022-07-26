@@ -9,6 +9,6 @@
 
 cd /scratch/dsc7746/willow
 
-args="data/control-10000 models/${SLURM_JOB_NAME} WaveNet"
+args="data/control-10000000 models/${SLURM_JOB_NAME} WaveNet"
 singularity exec --overlay ${overlay}:ro ${image} /bin/bash -c \
     "source /ext3/activate.sh; python -um willow train-network ${args}"
