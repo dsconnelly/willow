@@ -5,32 +5,35 @@ import time
 from importlib import import_module
 
 import joblib
-import numpy as np
-import torch, torch.nn as nn
+import torch
 
 from torch.utils.data import DataLoader, TensorDataset, random_split
 
-from ._utils import ScalingWrapper, logs, standardize, times
+from ..utils.data import StandardWrapper, load_data, prepare_data, standardize
+from ..utils.diagnostics import logs, times
 
 @logs
 @times
-def train_network(data_dir, model_dir, class_name):
+def train_network(data_dir, model_dir):
     """
     Train a neural network.
-    
+
     Parameters
     ----------
     data_dir : str
         Directory where training and test datasets are saved.
     model_dir : str
-        Directory where trained model will be saved.
-    class_name : str
-        Name of neural network model class.
-        
+        Directory where trained model will be saved. Should be prefixed with
+        the name of a class defined in _architectures.py, separated by a
+        hyphen, to determine which network architecture to use.
+
     """
     
-    X = torch.tensor(np.load(os.path.join(data_dir, 'X-tr.npy')))
-    Y = torch.tensor(np.load(os.path.join(data_dir, 'Y-tr.npy')))
+    model_name = os.path.basename(model_dir)
+    class_name = model_name.split('-')[0]
+    
+    X, Y = load_data(data_dir, 'tr')
+    X, Y = prepare_data(X, Y, model_name)
     
     n_samples, n_in = X.shape
     _, n_out = Y.shape
@@ -45,7 +48,7 @@ def train_network(data_dir, model_dir, class_name):
     Y_tr_scaled, means, stds = standardize(Y_tr, return_stats=True)
     Y_va_scaled = standardize(Y_va, means, stds)
     
-    architectures = import_module('._architectures', package='willow.train')
+    architectures = import_module('._architectures', package='willow.training')
     model = getattr(architectures, class_name)(n_in, n_out)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -77,7 +80,7 @@ def train_network(data_dir, model_dir, class_name):
         hours = (time.time() - training_start) / 3600
         if hours > max_hours or i == max_epochs:
             logging.info(f'Terminating after {i} epochs.')
-            model = ScalingWrapper(model, means, stds)
+            model = StandardWrapper(model, means, stds, model_name)
             joblib.dump(model, os.path.join(model_dir, 'model.pkl'))
             
             return

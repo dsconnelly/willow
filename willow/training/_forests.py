@@ -2,34 +2,37 @@ import logging
 import os
 
 import joblib
-import numpy as np
 
 from mubofo import BoostedForestRegressor
 from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.pipeline import make_pipeline
 
-from ._utils import ScalingWrapper, logs, standardize, times
+from ..utils.data import StandardWrapper, load_data, prepare_data, standardize
+from ..utils.diagnostics import logs, times
 
 @logs
 @times
-def train_forest(data_dir, model_dir, kind):
+def train_forest(data_dir, model_dir):
     """
     Train a boosted or random forest.
-    
+
     Parameters
     ----------
     data_dir : str
         Directory where training and test datasets are saved.
     model_dir : str
-        Directory where trained model will be saved.
-    kind : str
-        The kind of forest to train. Must be either 'boosted' or 'random'.
-    
+        Directory where trained model will be saved. Should be prefixed with
+        either 'boosted' or 'random', separated by a hyphen, to determine the
+        kind of forest to train.
+
     """
     
-    X = np.load(os.path.join(data_dir, 'X-tr.npy'))
-    Y = np.load(os.path.join(data_dir, 'Y-tr.npy'))
+    model_name = os.path.basename(model_dir)
+    kind = model_name.split('-')[0]
+    
+    X, Y = load_data(data_dir, 'tr')
+    X, Y = prepare_data(X, Y, model_name)
     Y_scaled, means, stds = standardize(Y, return_stats=True)
     
     kwargs = {
@@ -41,6 +44,8 @@ def train_forest(data_dir, model_dir, kind):
     
     if kind == 'random':
         model_class = RandomForestRegressor
+        
+        kwargs['verbose'] = 2
         
     elif kind == 'boosted':
         model_class = BoostedForestRegressor
@@ -57,23 +62,17 @@ def train_forest(data_dir, model_dir, kind):
     logging.info(f'Loaded {X.shape[0]} samples.')
     logging.info(f'Training a {model_class.__name__}.')
     
-    if 'shear' in model_dir:
-        logging.info('Using shear instead of buoyancy frequency.')
-        
-        shear = X[:, :39] - X[:, 1:40]
-        X = np.hstack((X[:, :40], shear, X[:, -2:]))
-    
-    if 'pca' in model_dir:
+    if 'pca' in model_name:
         logging.info('Using PCA in training pipeline.')
         
         estimator_class = model_class
         def model_class(**kwargs):
             return make_pipeline(
-                PCA(n_components=40),
+                PCA(n_components=0.8),
                 estimator_class(**kwargs)
             )
         
     model = model_class(**kwargs).fit(X, Y_scaled)
-    model = ScalingWrapper(model, means, stds)
+    model = StandardWrapper(model, means, stds, model_name)
     joblib.dump(model, os.path.join(model_dir, 'model.pkl'))
     
