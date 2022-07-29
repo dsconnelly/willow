@@ -7,10 +7,9 @@ from .data import preprocess
 from .training import train_forest, train_network
 
 if __name__ == '__main__':
-    parser = FunctionParser([
+    FunctionParser([
         preprocess, 
         train_forest, 
         train_network,
         plot_offline
-    ])
-    parser.run()
+    ]).run()
