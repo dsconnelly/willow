@@ -5,8 +5,10 @@ import pandas as pd
 import torch, torch.nn as nn
 
 class StandardWrapper:
-    def __init__(self, model, means, stds, name):
+    def __init__(self, name, model, means, stds, col_idx):
+        self.name = name
         self.model = model        
+        
         if self._is_torch():
             means = means.numpy()
             stds = stds.numpy()
@@ -14,13 +16,16 @@ class StandardWrapper:
         self.means = means
         self.stds = stds
         
-        self.name = name
+        self.col_idx = col_idx
         
     def predict(self, X):
         with torch.no_grad():
             out = self._apply(X)
             
-        return self.means + self.stds * out    
+        return self.means + self.stds * out
+    
+    def predict_online(self, X):
+        return self.predict(X[:, self.col_idx])
     
     def _apply(self, X):
         if self._is_torch():
@@ -40,17 +45,26 @@ def load_data(data_dir, suffix):
     
     return X, Y
     
-def prepare_data(X, Y, model_name):
+def prepare_data(X, Y, model_name, return_col_idx=False):
     name_parts = model_name.split('-')
     allowed = {'wind', 'shear', 'T', 'Nsq'}
     keep = allowed.intersection(set(name_parts))
     
-    cols = [s for s in X.columns if any([name in s for name in keep])]
+    cols, idx = [], []
+    for i, s in enumerate(X.columns):
+        if any([name in s for name in keep]):
+            cols.append(s)
+            idx.append(i)
+            
     cols = cols + ['surface pressure', 'latitude']
+    idx = np.array(idx)
     
     X, Y = X[cols].to_numpy(), Y.to_numpy()
     if name_parts[0] not in ['boosted', 'random']:
         X, Y = torch.tensor(X), torch.tensor(Y)
+        
+    if return_col_idx:
+        return X, Y, idx
         
     return X, Y
     

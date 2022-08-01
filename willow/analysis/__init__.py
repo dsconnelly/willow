@@ -1,3 +1,3 @@
-from ._offline import plot_offline
+from ._offline import plot_offline_scores
 
-__all__ = ['plot_offline']
+__all__ = ['plot_offline_scores']

@@ -9,9 +9,9 @@ from ..utils.data import load_data, prepare_data
 from ..utils.plotting import colors, format_latitude, get_pressures
 from ..utils.scores import R_squared
 
-def plot_offline(data_dir, model_dirs, output_path):
+def plot_offline_scores(data_dir, model_dirs, output_path):
     """
-    Plot training and test R-squared by level and latitude.
+    Plot training and test R-squared scores by level and latitude.
 
     Parameters
     ----------

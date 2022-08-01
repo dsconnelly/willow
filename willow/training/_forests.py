@@ -32,7 +32,7 @@ def train_forest(data_dir, model_dir):
     kind = model_name.split('-')[0]
     
     X, Y = load_data(data_dir, 'tr')
-    X, Y = prepare_data(X, Y, model_name)
+    X, Y, col_idx = prepare_data(X, Y, model_name, return_col_idx=True)
     Y_scaled, means, stds = standardize(Y, return_stats=True)
     
     kwargs = {
@@ -73,6 +73,6 @@ def train_forest(data_dir, model_dir):
             )
         
     model = model_class(**kwargs).fit(X, Y_scaled)
-    model = StandardWrapper(model, means, stds, model_name)
+    model = StandardWrapper(model_name, model, means, stds, col_idx)
     joblib.dump(model, os.path.join(model_dir, 'model.pkl'))
     

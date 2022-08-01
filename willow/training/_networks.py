@@ -33,7 +33,7 @@ def train_network(data_dir, model_dir):
     class_name = model_name.split('-')[0]
     
     X, Y = load_data(data_dir, 'tr')
-    X, Y = prepare_data(X, Y, model_name)
+    X, Y, col_idx = prepare_data(X, Y, model_name, return_col_idx=True)
     
     n_samples, n_in = X.shape
     _, n_out = Y.shape
@@ -80,7 +80,7 @@ def train_network(data_dir, model_dir):
         hours = (time.time() - training_start) / 3600
         if hours > max_hours or i == max_epochs:
             logging.info(f'Terminating after {i} epochs.')
-            model = StandardWrapper(model, means, stds, model_name)
+            model = StandardWrapper(model_name, model, means, stds, col_idx)
             joblib.dump(model, os.path.join(model_dir, 'model.pkl'))
             
             return
