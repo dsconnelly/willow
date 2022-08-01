@@ -17,9 +17,9 @@ def setup_mima(control_dir, model_dir, case_dir=None):
 
     """
     
+    model_name = os.path.basename(model_dir)
     if case_dir is None:
         parent_dir = os.path.dirname(control_dir)
-        model_name = os.path.basename(model_dir)
         case_dir = os.path.join(parent_dir, model_name)
     
     os.makedirs(os.path.join(case_dir, 'RESTART'), exist_ok=True)
@@ -32,27 +32,47 @@ def setup_mima(control_dir, model_dir, case_dir=None):
     fnames = ['diag_table', 'field_table', 'mima.x']
     for fname in fnames:
         shutil.copy2(os.path.join(control_dir, fname), case_dir)
-                
-    model_path = os.path.abspath(os.path.join(model_dir, 'model.pkl'))
-    with open(os.path.join(case_dir, 'input.nml'), 'w') as f:
-        for line in _get_lines(os.path.join(control_dir, 'input.nml')):
-            if 'use_forpy' in line:
-                f.write('     use_forpy = .true.,\n')
-                f.write(f'     forpy_model_path = \'{model_path}\' /\n')
-                
-            else:
-                f.write(line)
-                
-    with open(os.path.join(case_dir, 'submit.slurm'), 'w') as f:
-        for line in _get_lines(os.path.join(control_dir, 'submit.slurm')):
-            if control_dir in line:
-                line = line.replace(control_dir, case_dir)
-                
-            f.write(line)
+        
+    model_path = os.path.abspath(os.path.join(model_dir, 'model-new.pkl'))
+    _modify_copy(
+        os.path.join(control_dir, 'input.nml'),
+        os.path.join(case_dir, 'input.nml'),
+        _input_modifier,
+        model_path
+    )
     
+    _modify_copy(
+        os.path.join(control_dir, 'submit.slurm'),
+        os.path.join(case_dir, 'submit.slurm'),
+        _submit_modifier,
+        control_dir, case_dir, model_name
+    )
+          
 def _get_lines(path):
     with open(path) as f:
         return f.readlines()
-    
         
+def _input_modifier(line, model_path):
+    if 'use_forpy' in line:
+        return  (
+            '     use_forpy = .true.,\n'
+            f'     forpy_model_path = \'{model_path}\' /\n'
+        )
+    
+    return line
+
+def _submit_modifier(line, control_dir, case_dir, model_name):
+    if control_dir in line:
+        return line.replace(control_dir, case_dir)
+    
+    if 'job-name' in line:
+        return f'#SBATCH --job-name={model_name}\n'
+    
+    return line
+    
+def _modify_copy(src, dst, modifier, *args):
+    lines = _get_lines(src)
+    with open(dst, 'w') as f:
+        for line in lines:
+            f.write(modifier(line, *args))
     

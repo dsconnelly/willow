@@ -45,8 +45,6 @@ def train_forest(data_dir, model_dir):
     if kind == 'random':
         model_class = RandomForestRegressor
         
-        kwargs['verbose'] = 2
-        
     elif kind == 'boosted':
         model_class = BoostedForestRegressor
         

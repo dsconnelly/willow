@@ -1,13 +1,24 @@
 #!/bin/bash
 
-sbatch -J boosted-wind-T-c forests.slurm
-sbatch -J boosted-wind-Nsq-c forests.slurm
-sbatch -J boosted-wind-Nsq-pca-c forests.slurm
-sbatch -J boosted-wind-shear-c forests.slurm
-sbatch -J boosted-shear-Nsq-c forests.slurm
+forests=(
+    boosted-wind-T-e
+    boosted-wind-Nsq-e
+    boosted-wind-Nsq-pca-e
+    boosted-wind-shear-e
+    boosted-shear-Nsq-e
+    random-wind-T-e
+    random-wind-Nsq-e
+)
 
-sbatch -J random-wind-T-c forests.slurm
-sbatch -J random-wind-Nsq-c forests.slurm
+for name in "${forests[@]}"; do
+    sbatch -J ${name} willow.slurm train-forest data/control-1e7 models/${name}
+done
 
-sbatch -J WaveNet-wind-T-c networks.slurm
-sbatch -J WaveNet-wind-Nsq-c networks.slurm
+networks=(
+    WaveNet-wind-T-e
+    WaveNet-wind-Nsq-e
+)
+
+for name in "${networks[@]}"; do
+    sbatch -J ${name} willow.slurm train-network data/control-1e7 models/${name}
+done

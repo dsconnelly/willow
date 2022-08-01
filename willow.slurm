@@ -8,7 +8,5 @@
 #SBATCH --mail-type=END,FAIL
 
 cd /scratch/dsc7746/willow
-
-args="data/control-1e7 models/${SLURM_JOB_NAME}"
-singularity exec --overlay ${overlay}:ro ${image} /bin/bash -c \
-    "source /ext3/activate.sh; python -um willow train-forest ${args}"
+command="source /ext3/activate.sh; python -um willow $@"
+singularity exec --overlay ${overlay}:ro ${image} /bin/bash -c "${command}"
