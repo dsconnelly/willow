@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from ..utils.plotting import get_pressures
+from ..utils.plotting import format_pressure
 
 def make_datasets(case_dir, output_dir, n_samples=int(5e6)):
     """
@@ -55,7 +55,7 @@ def make_datasets(case_dir, output_dir, n_samples=int(5e6)):
                 
                 Ys.append(ds[f'gwf{component}_cgwd'].values)
                 
-            pressures = get_pressures()
+            pressures = [format_pressure(p) for p in ds.pfull.values]
             profile_names = lambda s: [f'{s} @ {p} hPa' for p in pressures]
             
             columns_X = (

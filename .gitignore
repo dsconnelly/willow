@@ -1,5 +1,5 @@
 *.ipynb_checkpoints*
 data/*
 models/*
-*.pyc
+*__pycache__*
 slurm.out

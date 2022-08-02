@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from ..utils.datasets import load_datasets, prepare_datasets
-from ..utils.plotting import colors, format_latitude, get_pressures
+from ..utils.plotting import colors, format_latitude, format_pressure
 from ..utils.statistics import R_squared
 
 def plot_offline_scores(data_dir, model_dirs, output_path):
@@ -33,8 +33,8 @@ def plot_offline_scores(data_dir, model_dirs, output_path):
         model = joblib.load(path)
 
         scores_by_lev[model.name] = {
-            'tr' : _score_model(X_tr, Y_tr, model),
-            'te' : _score_model(X_te, Y_te, model)
+            'tr' : _get_scores(X_tr, Y_tr, model),
+            'te' : _get_scores(X_te, Y_te, model)
         }
         
         scores_by_lat[model.name] = {
@@ -47,13 +47,17 @@ def plot_offline_scores(data_dir, model_dirs, output_path):
     
     gs = gridspec.GridSpec(ncols=2, nrows=1, width_ratios=[1, 2], figure=fig)
     axes = [fig.add_subplot(gs[0, i]) for i in range(2)]
+
+    lats = np.linspace(-90, 90, 64)
+    pressures = [s.split('@')[-1].split()[0] for s in X_tr.columns if 'T' in s]
+    y = np.arange(len(pressures))
     
-    ax, y, pressures = _setup_lev_axis(axes[0])
+    ax = _setup_lev_axis(axes[0], pressures, y)
     for color, (model_name, scores) in zip(colors, scores_by_lev.items()):
         ax.plot(scores['tr'], -y, color=color, label=model_name)
         ax.plot(scores['te'], -y, color=color, ls='dashed')
         
-    ax, lats = _setup_lat_axis(axes[1]), np.linspace(-90, 90, 64)
+    ax = _setup_lat_axis(axes[1])
     for color, (model_name, scores) in zip(colors, scores_by_lat.items()):
         ax.plot(lats, scores['tr'], color=color, label=model_name)
         ax.plot(lats, scores['te'], color=color, ls='dashed')
@@ -63,6 +67,11 @@ def plot_offline_scores(data_dir, model_dirs, output_path):
     ax.legend()
        
     plt.savefig(output_path, dpi=400)
+
+def _get_scores(X, Y, model):
+    X, Y = prepare_datasets(X, Y, model.name)
+    
+    return R_squared(Y, model.predict(X))
     
 def _get_scores_by_lat(X, Y, model):
     lats = np.sort(X['latitude'].unique())
@@ -70,15 +79,10 @@ def _get_scores_by_lat(X, Y, model):
     
     for i, lat in enumerate(lats):
         idx = X['latitude'] == lat
-        scores[i] = _score_model(X[idx], Y[idx], model).mean()
+        scores[i] = _get_scores(X[idx], Y[idx], model).mean()
         
     return scores
     
-def _score_model(X, Y, model):
-    X, Y = prepare_datasets(X, Y, model.name)
-    
-    return R_squared(Y, model.predict(X))
-
 def _setup_lat_axis(ax):
     ax.set_xlim(-90, 90)
     ax.set_ylim(0.2, 1)
@@ -98,10 +102,7 @@ def _setup_lat_axis(ax):
     
     return ax
     
-def _setup_lev_axis(ax):
-    pressures = get_pressures()
-    y = np.arange(len(pressures))
-    
+def _setup_lev_axis(ax, pressures, y):
     ax.set_xlim(0.2, 1)
     ax.set_ylim(-y[-1], -y[0])
     
@@ -115,4 +116,4 @@ def _setup_lev_axis(ax):
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     
-    return ax, y, pressures
+    return ax
