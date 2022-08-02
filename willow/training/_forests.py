@@ -8,31 +8,15 @@ from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.pipeline import make_pipeline
 
-from ..utils.data import StandardWrapper, load_data, prepare_data, standardize
-from ..utils.diagnostics import logs, times
+from ..utils.datasets import load_data, prepare_data
+from ..utils.transforms import StandardizedModel, standardize
 
-@logs
-@times
-def train_forest(data_dir, model_dir):
-    """
-    Train a boosted or random forest.
-
-    Parameters
-    ----------
-    data_dir : str
-        Directory where training and test datasets are saved.
-    model_dir : str
-        Directory where trained model will be saved. Should be prefixed with
-        either 'boosted' or 'random', separated by a hyphen, to determine the
-        kind of forest to train.
-
-    """
-    
+def train_forest(data_dir, model_dir):    
     model_name = os.path.basename(model_dir)
     kind = model_name.split('-')[0]
     
-    X, Y = load_data(data_dir, 'tr')
-    X, Y, col_idx = prepare_data(X, Y, model_name, return_col_idx=True)
+    X, Y = load_datasets(data_dir, 'tr')
+    X, Y, col_idx = prepare_datasets(X, Y, model_name, return_col_idx=True)
     Y_scaled, means, stds = standardize(Y, return_stats=True)
     
     kwargs = {
@@ -71,6 +55,6 @@ def train_forest(data_dir, model_dir):
             )
         
     model = model_class(**kwargs).fit(X, Y_scaled)
-    model = StandardWrapper(model_name, model, means, stds, col_idx)
+    model = StandardizedModel(model_name, model, means, stds, col_idx)
     joblib.dump(model, os.path.join(model_dir, 'model.pkl'))
     

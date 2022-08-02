@@ -33,7 +33,7 @@ def setup_mima(control_dir, model_dir, case_dir=None):
     for fname in fnames:
         shutil.copy2(os.path.join(control_dir, fname), case_dir)
         
-    model_path = os.path.abspath(os.path.join(model_dir, 'model-new.pkl'))
+    model_path = os.path.abspath(os.path.join(model_dir, 'model.pkl'))
     _modify_copy(
         os.path.join(control_dir, 'input.nml'),
         os.path.join(case_dir, 'input.nml'),
@@ -61,18 +61,28 @@ def _input_modifier(line, model_path):
     
     return line
 
+def _modify_copy(src, dst, modifier, *args):
+    with open(dst, 'w') as f:
+        for line in _get_lines(src):
+            f.write(modifier(line, *args))
+
 def _submit_modifier(line, control_dir, case_dir, model_name):
     if control_dir in line:
         return line.replace(control_dir, case_dir)
+
+    if '--mem' in line:
+        return line.replace('8G', '16G')
     
     if 'job-name' in line:
         return f'#SBATCH --job-name={model_name}\n'
+
+    if './mima.x' in line:
+        return 'export PYTHONWARNINGS=ignore::UserWarning\n' + line
+
+    if '{01..40}' in line:
+        return line.replace('{01..40}', '{01..05}')
     
     return line
     
-def _modify_copy(src, dst, modifier, *args):
-    lines = _get_lines(src)
-    with open(dst, 'w') as f:
-        for line in lines:
-            f.write(modifier(line, *args))
+
     

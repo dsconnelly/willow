@@ -7,7 +7,7 @@ import xarray as xr
 
 from ..utils.plotting import get_pressures
 
-def preprocess(case_dir, output_dir, n_samples=int(5e6)):
+def make_datasets(case_dir, output_dir, n_samples=int(5e6)):
     """
     Read MiMA output data and save training and test sets.
 

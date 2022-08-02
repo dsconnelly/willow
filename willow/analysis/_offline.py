@@ -5,7 +5,7 @@ import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import numpy as np
 
-from ..utils.data import load_data, prepare_data
+from ..utils.datasets import load_datasets, prepare_datasets
 from ..utils.plotting import colors, format_latitude, get_pressures
 from ..utils.scores import R_squared
 
@@ -24,8 +24,8 @@ def plot_offline_scores(data_dir, model_dirs, output_path):
 
     """
     
-    X_tr, Y_tr = load_data(data_dir, 'tr')
-    X_te, Y_te = load_data(data_dir, 'te')
+    X_tr, Y_tr = load_datasets(data_dir, 'tr')
+    X_te, Y_te = load_datasets(data_dir, 'te')
     
     scores_by_lev, scores_by_lat = {}, {}
     for model_dir in model_dirs:
@@ -75,7 +75,7 @@ def _get_scores_by_lat(X, Y, model):
     return scores
     
 def _score_model(X, Y, model):
-    X, Y = prepare_data(X, Y, model.name)
+    X, Y = prepare_datasets(X, Y, model.name)
     
     return R_squared(Y, model.predict(X))
 
