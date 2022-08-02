@@ -8,8 +8,9 @@ from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.pipeline import make_pipeline
 
-from ..utils.datasets import load_data, prepare_data
-from ..utils.transforms import StandardizedModel, standardize
+from ..utils.datasets import load_datasets, prepare_datasets
+from ..utils.statistics import standardize
+from ..utils.wrappers import MiMAModel
 
 def train_forest(data_dir, model_dir):    
     model_name = os.path.basename(model_dir)
@@ -55,6 +56,6 @@ def train_forest(data_dir, model_dir):
             )
         
     model = model_class(**kwargs).fit(X, Y_scaled)
-    model = StandardizedModel(model_name, model, means, stds, col_idx)
+    model = MiMAModel(model_name, model, means, stds, col_idx)
     joblib.dump(model, os.path.join(model_dir, 'model.pkl'))
     

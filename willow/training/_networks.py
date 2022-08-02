@@ -10,7 +10,8 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset, random_split
 
 from ..utils.datasets import load_datasets, prepare_datasets
-from ..utils.transforms import StandardizedModel, standardize
+from ..utils.statistics import standardize
+from ..utils.wrappers import MiMAModel
 
 def train_network(data_dir, model_dir):    
     model_name = os.path.basename(model_dir)
@@ -64,7 +65,7 @@ def train_network(data_dir, model_dir):
         hours = (time.time() - training_start) / 3600
         if hours > max_hours or i == max_epochs:
             logging.info(f'Terminating after {i} epochs.')
-            model = StandardizedModel(model_name, model, means, stds, col_idx)
+            model = MiMAModel(model_name, model, means, stds, col_idx)
             joblib.dump(model, os.path.join(model_dir, 'model.pkl'))
             
             return

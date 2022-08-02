@@ -7,7 +7,7 @@ import numpy as np
 
 from ..utils.datasets import load_datasets, prepare_datasets
 from ..utils.plotting import colors, format_latitude, get_pressures
-from ..utils.scores import R_squared
+from ..utils.statistics import R_squared
 
 def plot_offline_scores(data_dir, model_dirs, output_path):
     """
