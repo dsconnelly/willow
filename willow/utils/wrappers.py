@@ -14,17 +14,15 @@ class StandardizedModel:
         self.stds = stds
 
     def predict(self, X):
-        with torch.no_grad():
-            out = self._apply(X)
-            
-        return self.means + self.stds * out
+        return self.means + self.stds * self._apply(X)
 
     def _apply(self, X):
         if self._is_torch():
             if not isinstance(X, torch.Tensor):
                 X = torch.tensor(X)
                 
-            return self.model(X).double().numpy()
+            with torch.no_grad():
+                return self.model(X).double().numpy()
         
         return self.model.predict(X)
     

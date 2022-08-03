@@ -4,9 +4,13 @@ import numpy as np
 import pandas as pd
 import torch
     
-def load_datasets(data_dir, suffix):
+def load_datasets(data_dir, suffix, n_samples=None):
     X = pd.read_pickle(os.path.join(data_dir, f'X-{suffix}.pkl'))
     Y = pd.read_pickle(os.path.join(data_dir, f'Y-{suffix}.pkl'))
+
+    if n_samples is not None:
+        idx = np.random.choice(len(X), size=n_samples, replace=False)
+        X, Y = X.iloc[idx], Y.iloc[idx]
     
     return X, Y
     

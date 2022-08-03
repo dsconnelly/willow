@@ -24,8 +24,8 @@ def plot_offline_scores(data_dir, model_dirs, output_path):
 
     """
     
-    X_tr, Y_tr = load_datasets(data_dir, 'tr')
-    X_te, Y_te = load_datasets(data_dir, 'te')
+    X_tr, Y_tr = load_datasets(data_dir, 'tr', int(1e5))
+    X_te, Y_te = load_datasets(data_dir, 'te', int(1e5))
     
     scores_by_lev, scores_by_lat = {}, {}
     for model_dir in model_dirs:
@@ -33,8 +33,8 @@ def plot_offline_scores(data_dir, model_dirs, output_path):
         model = joblib.load(path)
 
         scores_by_lev[model.name] = {
-            'tr' : _get_scores(X_tr, Y_tr, model),
-            'te' : _get_scores(X_te, Y_te, model)
+            'tr' : _get_scores_by_lev(X_tr, Y_tr, model),
+            'te' : _get_scores_by_lev(X_te, Y_te, model)
         }
         
         scores_by_lat[model.name] = {
@@ -61,14 +61,14 @@ def plot_offline_scores(data_dir, model_dirs, output_path):
     for color, (model_name, scores) in zip(colors, scores_by_lat.items()):
         ax.plot(lats, scores['tr'], color=color, label=model_name)
         ax.plot(lats, scores['te'], color=color, ls='dashed')
-        
+
     ax.plot([], [], color='gray', label='training')
     ax.plot([], [], color='gray', ls='dashed', label='test')
     ax.legend()
        
     plt.savefig(output_path, dpi=400)
 
-def _get_scores(X, Y, model):
+def _get_scores_by_lev(X, Y, model):
     X, Y = prepare_datasets(X, Y, model.name)
     
     return R_squared(Y, model.predict(X))
@@ -79,10 +79,10 @@ def _get_scores_by_lat(X, Y, model):
     
     for i, lat in enumerate(lats):
         idx = X['latitude'] == lat
-        scores[i] = _get_scores(X[idx], Y[idx], model).mean()
-        
+        scores[i] = np.nanmean(_get_scores_by_lev(X[idx], Y[idx], model))
+
     return scores
-    
+     
 def _setup_lat_axis(ax):
     ax.set_xlim(-90, 90)
     ax.set_ylim(0.2, 1)

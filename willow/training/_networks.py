@@ -65,7 +65,7 @@ def train_network(data_dir, model_dir):
         hours = (time.time() - training_start) / 3600
         if hours > max_hours or i == max_epochs:
             logging.info(f'Terminating after {i} epochs.')
-            model = MiMAModel(model_name, model, means, stds, col_idx)
+            model = MiMAModel(model_name, model.eval(), means, stds, col_idx)
             joblib.dump(model, os.path.join(model_dir, 'model.pkl'))
             
             return

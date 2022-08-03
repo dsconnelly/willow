@@ -7,10 +7,10 @@ def R_squared(Y, output):
     ss_tot = ((Y - means) ** 2).sum(axis=0)
     
     mask = ss_tot != 0
-    output = np.zeros(Y.shape[1])
-    output[mask] = 1 - (ss_res[mask] / ss_tot[mask])
+    scores = np.nan * np.zeros(Y.shape[1])
+    scores[mask] = 1 - (ss_res[mask] / ss_tot[mask])
     
-    return output
+    return scores
 
 def standardize(A, means=None, stds=None, return_stats=False):
     if means is None:
