@@ -19,7 +19,7 @@ def prepare_datasets(X, Y, model_name, return_col_idx=False):
     keep, idx = _filter_columns(name_parts, X.columns)                
     X, Y = X[keep].to_numpy(), Y.to_numpy()
 
-    if name_parts[0] not in ['boosted', 'random']:
+    if name_parts[0] not in ['mubofo', 'random', 'xgboost']:
         X, Y = torch.tensor(X), torch.tensor(Y)
         
     if return_col_idx:

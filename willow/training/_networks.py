@@ -7,7 +7,7 @@ from importlib import import_module
 import joblib
 import torch
 
-from torch.utils.data import DataLoader, TensorDataset, random_split
+from torch.utils.data import DataLoader, TensorDataset
 
 from ..utils.datasets import load_datasets, prepare_datasets
 from ..utils.statistics import standardize

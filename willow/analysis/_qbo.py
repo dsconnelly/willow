@@ -21,19 +21,26 @@ def plot_qbos(case_dirs, output_path):
 
     """
 
-    n_subplots = len(case_dirs)
-    height_ratios = [1] * n_subplots + [0.1]
+    n_qbos = len(case_dirs)
+    n_rows = min(n_qbos, 3)
+    n_cols = (n_qbos + 2) // 3
 
+    cbar_scale = 0.1
     fig = plt.figure(constrained_layout=True)
-    fig.set_size_inches(9, 3 * n_subplots + 0.3)
+    fig.set_size_inches(9 * n_cols, 3 * (n_rows + cbar_scale))
+
+    height_ratios = [1] * n_rows + [cbar_scale]
     gs = gridspec.GridSpec(
-        ncols=1, nrows=(n_subplots + 1),
+        ncols=n_cols, nrows=(n_rows + 1),
         height_ratios=height_ratios,
         figure=fig
     )
 
-    axes = [fig.add_subplot(gs[i, 0]) for i in range(n_subplots)]
-    cax = fig.add_subplot(gs[n_subplots, 0])
+    axes, cax = [], fig.add_subplot(gs[-1, :])
+    for j in range(n_cols):
+        for i in range(n_rows):
+            if len(axes) < n_qbos:
+                axes.append(fig.add_subplot(gs[i, j]))
 
     data = {os.path.basename(s) : load_qbo(s, n_years=12) for s in case_dirs}
     vmax = max([abs(u).max() for _, u in data.items()])

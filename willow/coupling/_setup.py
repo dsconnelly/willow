@@ -29,8 +29,7 @@ def setup_mima(control_dir, model_dir, case_dir=None):
         dirs_exist_ok=True
     )
     
-    fnames = ['diag_table', 'field_table', 'mima.x']
-    for fname in fnames:
+    for fname in ['field_table', 'mima.x']:
         shutil.copy2(os.path.join(control_dir, fname), case_dir)
         
     model_path = os.path.abspath(os.path.join(model_dir, 'model.pkl'))
@@ -40,6 +39,12 @@ def setup_mima(control_dir, model_dir, case_dir=None):
         _input_modifier,
         model_path
     )
+
+    _modify_copy(
+        os.path.join(control_dir, 'diag_table'),
+        os.path.join(case_dir, 'diag_table'),
+        _diag_modifier
+    )
     
     _modify_copy(
         os.path.join(control_dir, 'submit.slurm'),
@@ -47,6 +52,13 @@ def setup_mima(control_dir, model_dir, case_dir=None):
         _submit_modifier,
         control_dir, case_dir, model_name
     )
+
+def _diag_modifier(line):
+    drop = ['sphum', 'bf_cgwd', 'precip']
+    if any([s in line for s in drop]):
+        return None
+
+    return line
           
 def _get_lines(path):
     with open(path) as f:
@@ -64,23 +76,32 @@ def _input_modifier(line, model_path):
 def _modify_copy(src, dst, modifier, *args):
     with open(dst, 'w') as f:
         for line in _get_lines(src):
-            f.write(modifier(line, *args))
+            modified = modifier(line, *args)
+            if modified is not None:
+                f.write(modified)
 
 def _submit_modifier(line, control_dir, case_dir, model_name):
-    if control_dir in line:
+    if '--out' in line:
         return line.replace(control_dir, case_dir)
 
     if '--mem' in line:
         return line.replace('8G', '16G')
     
-    if 'job-name' in line:
-        return f'#SBATCH --job-name={model_name}\n'
+    if '--job-name' in line:
+        return f'#SBATCH --job-name={model_name}-online\n'
+
+    if line.startswith('cd'):
+        src = os.path.join(control_dir, 'INPUT', '*')
+        dst = os.path.join(case_dir, 'INPUT')
+        copier = f'cp {src} {dst}\n'
+
+        return line.replace(control_dir, case_dir) + copier
 
     if './mima.x' in line:
         return 'export PYTHONWARNINGS=ignore::UserWarning\n' + line
 
     if '{01..40}' in line:
-        return line.replace('{01..40}', '{01..05}')
+        return line.replace('{01..40}', '{01..15}')
     
     return line
     
