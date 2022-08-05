@@ -5,6 +5,29 @@ import pandas as pd
 import torch
     
 def load_datasets(data_dir, suffix, n_samples=None):
+    """
+    Load pandas DataFrames from disk, with optional subsampling.
+
+    Parameters
+    ----------
+    data_dir : str
+        The directory containing the pickled DataFrames.
+    suffix : str
+        The suffix to be added on to the file names. Should be 'tr' or 'te'.
+    n_samples : int
+        How many rows of each DataFrame should be randomly sampled to return. If
+        None, each DataFrame will be returned in full.
+
+    Returns
+    -------
+    X, Y : pd.DataFrame
+        DataFrames with input and output variables. X contains all possible
+        input variables (wind, shear, temperature, buoyancy frequency, surface
+        pressure, and latitude). Y contains the corresponding gravity wave drag
+        profiles for each sample.
+
+    """
+
     X = pd.read_pickle(os.path.join(data_dir, f'X-{suffix}.pkl'))
     Y = pd.read_pickle(os.path.join(data_dir, f'Y-{suffix}.pkl'))
 
@@ -15,6 +38,31 @@ def load_datasets(data_dir, suffix, n_samples=None):
     return X, Y
     
 def prepare_datasets(X, Y, model_name, return_col_idx=False):
+    """
+    Extract the relevant input variables for a given model.
+
+    Parameters
+    ----------
+    X, Y : pd.DataFrame
+        DataFrames of input and output data, as returned by load_datasets.
+    model_name : str
+        The name of the model being trained. It should be a hyphen-separated
+        list of (potentially among other things) input variable names, which can
+        be 'wind', 'shear', 'T', and 'Nsq'.
+    return_col_idx : bool
+        Whether to return the indices corresponding to the returned columns of
+        X. These indices are useful for coupling models to MiMA, where the model
+        needs to extract input variables from an unlabeled array.
+
+    Returns
+    -------
+    X, Y : np.ndarry or torch.Tensor
+        The extracted input and output data. If The first hyphen-separated part
+        of model_name does not specify a kind of forest, the model is assumed to
+        be a torch model, and the outputs are cast as torch.Tensors.
+
+    """
+
     name_parts = model_name.split('-')
     keep, idx = _filter_columns(name_parts, X.columns)                
     X, Y = X[keep].to_numpy(), Y.to_numpy()

@@ -5,6 +5,27 @@ import scipy.signal as signal
 import xarray as xr
 
 def load_qbo(case_dir, n_years=24):
+    """
+    Load the QBO signal from a MiMA run with yearly output subdirectories.
+
+    Parameters
+    ----------
+    case_dir : str
+        The directory where MiMA was run. Should contain subdirectories named
+        with two-digit integers corresponding to each year of ouput, each of
+        which contains an 'atmos_4xdaily.nc' file.
+    n_years : int
+        The number of years of data to return. Years will be counted back from
+        the end of the MiMA run.
+
+    Returns
+    -------
+    u : xr.DataArray
+        A DataArray containing the tropical-mean zonal-mean zonal wind at
+        pressure levels less than 115 hPa for years indicated.
+
+    """
+
     years = sorted([s for s in os.listdir(case_dir) if s.isdigit()])[-n_years:]
     fnames = [os.path.join(case_dir, y, 'atmos_4xdaily.nc') for y in years]
 
@@ -15,6 +36,32 @@ def load_qbo(case_dir, n_years=24):
     return u.load()
 
 def qbo_statistics(u):
+    """
+    Compute the period and amplitude of a QBO signal.
+
+    Parameters
+    ----------
+    u : xr.DataArray
+        The QBO signal, as returned by load_qbo.
+
+    Returns
+    -------
+    period : float
+        The QBO period in months. Calculated by taking a Fourier transform and
+        returning the period with maximum spectral power at 27 hPa.
+    period_err : float
+        The error in the period calculation in months. Calculated as the
+        half-width of the spectral peak used to select the period.
+    amp : float
+        The QBO amplitude in meters per second. Calculated as the standard
+        deviation of the signal at 20 hPa.
+    amp_err : float
+        The error in the amplitude calculation in meters per second. Calculated
+        by bootstrapping subsamples, computing their standard deviation, and
+        returning the half-width of the 95% confidence interval.
+
+    """
+
     u = _apply_butterworth(u)
     period, period_err = _qbo_period(u)
     amp, amp_err = _qbo_amplitude(u)

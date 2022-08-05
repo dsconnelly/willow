@@ -5,6 +5,24 @@ import sys
 import time
 
 def logs(func):
+    """
+    Decorate functions with certain arguments to enable automatic logging.
+
+    Parameters
+    ----------
+    func : callable
+        The function to set up logging for. Should take 'model_dir' as a
+        positional argument.
+
+    Returns
+    -------
+    func_with_logging : callable
+        A function that, before calling func, reads the 'model_dir' positional
+        argument and creates a log file in that directory, to which standard
+        output and Python tracebacks will be written.
+
+    """
+
     @functools.wraps(func)
     def func_with_logging(*args, **kwargs):
         model_dir = kwargs['model_dir']
@@ -35,6 +53,22 @@ def logs(func):
     return func_with_logging
 
 def times(func):
+    """
+    Decorate functions to log their runtimes.
+
+    Parameters
+    ----------
+    func : callable
+        The function to be timed.
+
+    Returns
+    -------
+    timed_func : callable
+        A function that checks the time before and after func is called and logs
+        a message with the runtime before returning the output of func.
+        
+    """
+
     @functools.wraps(func)
     def timed_func(*args, **kwargs):
         start = time.time()
