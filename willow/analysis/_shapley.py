@@ -10,7 +10,7 @@ from ..utils.diagnostics import logs, times
 from ..utils.plotting import format_pressure
 from ..utils.shapley import combine_by_level, compute_shapely_values
 
-#@logs
+@logs
 @times
 def plot_shapley_values(model_dir, output_dir, data_dir=None):
     """
