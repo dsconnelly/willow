@@ -1,11 +1,28 @@
 #!/bin/bash
 
+python () {
+    cmd="python $@"
+    singularity exec --overlay ${overlay}:ro ${image} /bin/bash -c \
+        "source /ext3/activate.sh; ${cmd}"
+}
+
+suffix="i"
+ddir="data/control-1e7"
+cdir="/scratch/dsc7746/cases"
+
+kinds=(
+    mubofo
+    xgboost
+    random
+    WaveNet
+)
+
 models=(
     mubofo-wind-T
     mubofo-wind-Nsq
     mubofo-wind-shear
     mubofo-shear-Nsq
-    mubofo-wind-Nsq-pca
+    # mubofo-wind-Nsq-pca
 
     xgboost-wind-Nsq
     xgboost-wind-shear
@@ -17,52 +34,64 @@ models=(
     WaveNet-wind-Nsq
 )
 
-python ()
-{ 
-    cmd="python $@";
-    singularity exec --overlay ${overlay}:ro ${image} /bin/bash -c \
-        "source /ext3/activate.sh; $cmd"
-}
+case $1 in
 
-suffix="i"
-data="data/control-1e7"
-
-if [ $1 == "train" ] || [ $1 == "offline" ]; then
-    for model in "${models[@]}"; do
-        name="${model}-${suffix}"
-
-        if [ $1 == "train" ]; then
-            args="train-emulator ${data} models/${name}"
-            sbatch -J "${name}-train" willow.slurm $args
-
-        elif [ $1 == "online" ]; then
-            args="setup-mima /scratch/dsc7746/cases/control models/${name}"
-            python -m willow $args
-            sbatch /scratch/dsc7746/cases/${name}/submit.slurm
-
-        fi
-    done
-
-elif [ $1 == "plot-offline" ]; then
-    kinds=(
-        mubofo
-        xgboost
-        random
-        WaveNet
-    )
-
-    for kind in "${kinds[@]}"; do
-        args=""
+    "train")
         for model in "${models[@]}"; do
-            if [[ $model == ${kind}-* ]]; then
-                args="${args}models/${model}-${suffix},"
-            fi
+            name="${model}-${suffix}"
+            args="train-emulator ${ddir} models/${name}"
+            sbatch -J "${name}-train" willow.slurm ${args}
+        done
+        ;;
+
+    "plot-offline")
+        for kind in "${kinds[@]}"; do
+            use=""
+            for model in "${models[@]}"; do
+                if [[ $model == ${kind}-* ]]; then
+                    use="${use}models/${model}-${suffix},"
+                fi
+            done
+
+            fname="plots/offline-scores/${kind}-${suffix}-scores.png"
+            args="${ddir} ${use%?} ${fname}"
+            python -m willow plot-offline-scores ${args}
+        done
+        ;;
+
+    "plot-shapley")
+        odir="plots/shapley"
+        for model in "${models[@]}"; do
+            name="${model}-${suffix}"
+            cmd="plot-shapley-values"
+            
+            args="${cmd} models/${name} ${odir} --data-dir ${ddir}"
+            sbatch -J "${name}-shapley" willow.slurm ${args}
+        done
+        ;;
+
+    "online")
+        for model in "${models[@]}"; do
+            name="${model}-${suffix}"
+            args="setup-mima ${cdir}/control models/${name}"
+            python -m willow ${args}
+            sbatch "${cdir}/${name}/submit.slurm"
+        done
+        ;;
+
+    "plot-qbos")
+        use="${cdir}/control"
+        for model in "${models[@]}"; do
+            name="${model}-${suffix}"
+            use="${use},${cdir}/${name}"
         done
 
-        args="${data} ${args%?} plots/offline/${kind}-scores.png"
-        python -m willow plot-offline-scores $args
-    done
+        args="${use} plots/qbos/qbos-${suffix}.png"
+        python -m willow plot-qbos ${args}
+        ;;
 
-else
-    echo "Unknown command $1"
-fi
+    *)
+        echo "unknown command $1"
+        ;;
+        
+esac

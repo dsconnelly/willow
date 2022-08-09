@@ -65,7 +65,7 @@ class StandardizedModel:
         if self.is_xgboost:
             X = xgb.DMatrix(X)
 
-        return self.model.predict(X)
+        return self.model.predict(X).astype(np.float64)
 
 class MiMAModel(StandardizedModel):
     """StandardizedModel subclass to handle online predictions."""

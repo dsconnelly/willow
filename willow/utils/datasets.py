@@ -37,7 +37,7 @@ def load_datasets(data_dir, suffix, n_samples=None):
     
     return X, Y
     
-def prepare_datasets(X, Y, model_name, return_col_idx=False):
+def prepare_datasets(X, Y, model_name, as_array=True, return_col_idx=False):
     """
     Extract the relevant input variables for a given model.
 
@@ -49,6 +49,9 @@ def prepare_datasets(X, Y, model_name, return_col_idx=False):
         The name of the model being trained. It should be a hyphen-separated
         list of (potentially among other things) input variable names, which can
         be 'wind', 'shear', 'T', and 'Nsq'.
+    as_array : True
+        Whether the outputs should be cast from a pd.DataFrame to an array class
+        (either a np.array or a torch.Tensor, depending on model_name).
     return_col_idx : bool
         Whether to return the indices corresponding to the returned columns of
         X. These indices are useful for coupling models to MiMA, where the model
@@ -64,11 +67,13 @@ def prepare_datasets(X, Y, model_name, return_col_idx=False):
     """
 
     name_parts = model_name.split('-')
-    keep, idx = _filter_columns(name_parts, X.columns)                
-    X, Y = X[keep].to_numpy(), Y.to_numpy()
-
-    if name_parts[0] not in ['mubofo', 'random', 'xgboost']:
-        X, Y = torch.tensor(X), torch.tensor(Y)
+    keep, idx = _filter_columns(name_parts, X.columns)   
+    X = X[keep]
+    
+    if as_array:          
+        X, Y = X.to_numpy(), Y.to_numpy()
+        if name_parts[0] not in ['mubofo', 'random', 'xgboost']:
+            X, Y = torch.tensor(X), torch.tensor(Y)
         
     if return_col_idx:
         return X, Y, idx

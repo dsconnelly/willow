@@ -29,8 +29,9 @@ def logs(func):
         if not os.path.exists(model_dir):
             os.makedirs(model_dir)
             
+        fname = func.__name__.replace('_', '-') + '-log.out'
         logging.basicConfig(
-            filename=os.path.join(model_dir, 'log.out'),
+            filename=os.path.join(model_dir, fname),
             filemode='w',
             format='%(message)s',
             level=logging.INFO
