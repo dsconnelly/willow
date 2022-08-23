@@ -85,10 +85,13 @@ def _submit_modifier(line, control_dir, case_dir, model_name):
         return line.replace(control_dir, case_dir)
 
     if '--mem' in line:
-        return line.replace('8G', '16G')
+        return line.replace('8G', '64G' if 'random' in model_name else '16G')
     
     if '--job-name' in line:
         return f'#SBATCH --job-name={model_name}-online\n'
+
+    if 'openmpi' in line:
+        return line + 'module load cdo/intel/1.9.10\n'
 
     if line.startswith('cd'):
         src = os.path.join(control_dir, 'INPUT', '*')
@@ -102,6 +105,30 @@ def _submit_modifier(line, control_dir, case_dir, model_name):
 
     if '{01..40}' in line:
         return line.replace('{01..40}', '{01..15}')
+
+    if 'mv RESTART/* INPUT' in line:
+        lines = [
+            '    ' + line.strip(), '',
+            '    cdo --reduce-dim \\',
+            '        -daymean -zonmean -mermean \\',
+            '        -sellonlatbox,0.0,360.0,-5.0,5.0 \\',
+            '        -selname,u_gwf \\',
+            '        ${yy}/atmos_4xdaily.nc ${yy}/qbo.nc', '',
+            '    rm ${yy}/atmos_4xdaily.nc'
+        ]
+
+        return ''.join([s + '\n' for s in lines])
+
+    if 'rm .model.run' in line:
+        lines = [
+            line.strip(), '',
+            'cdo mergetime ??/qbo.nc qbo.nc',
+            'for yy in {01..15}; do',
+            '    rm -rf ${yy}',
+            'done'
+        ]
+
+        return ''.join([s + '\n' for s in lines])
     
     return line
     

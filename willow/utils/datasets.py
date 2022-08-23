@@ -49,7 +49,7 @@ def prepare_datasets(X, Y, model_name, as_array=True, return_col_idx=False):
         The name of the model being trained. It should be a hyphen-separated
         list of (potentially among other things) input variable names, which can
         be 'wind', 'shear', 'T', and 'Nsq'.
-    as_array : True
+    as_array : bool
         Whether the outputs should be cast from a pd.DataFrame to an array class
         (either a np.array or a torch.Tensor, depending on model_name).
     return_col_idx : bool

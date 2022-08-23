@@ -21,17 +21,25 @@ def load_qbo(case_dir, n_years=24):
     Returns
     -------
     u : xr.DataArray
-        A DataArray containing the tropical-mean zonal-mean zonal wind at
+        A DataArray containing the daily tropical-mean zonal-mean zonal wind at
         pressure levels less than 115 hPa for years indicated.
 
     """
 
-    years = sorted([s for s in os.listdir(case_dir) if s.isdigit()])[-n_years:]
-    fnames = [os.path.join(case_dir, y, 'atmos_4xdaily.nc') for y in years]
+    path = os.path.join(case_dir, 'qbo.nc')
+    if os.path.exists(path):
+        with xr.open_dataset(path, decode_times=False) as ds:
+            u = ds['u_gwf'].sel(pfull=slice(None, 115))
+            u = u.isel(time=slice(-(360 * n_years), None))
+            u = u.assign_coords(time=u['time'].astype(int))
 
-    with xr.open_mfdataset(fnames, decode_times=False) as ds:
-        u = ds['u_gwf'].sel(pfull=slice(None, 115)).sel(lat=slice(-5, 5))
-        u = u.groupby(u['time'].astype(int)).mean(('time', 'lat', 'lon'))
+    else:
+        years = sorted([s for s in os.listdir(case_dir) if s.isdigit()])
+        fnames = [os.path.join(case_dir, y, 'atmos_4xdaily.nc') for y in years]
+
+        with xr.open_mfdataset(fnames[-n_years:], decode_times=False) as ds:
+            u = ds['u_gwf'].sel(pfull=slice(None, 115)).sel(lat=slice(-5, 5))
+            u = u.groupby(u['time'].astype(int)).mean(('time', 'lat', 'lon'))
 
     return u.load()
 

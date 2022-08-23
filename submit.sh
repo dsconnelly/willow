@@ -6,7 +6,7 @@ python () {
         "source /ext3/activate.sh; ${cmd}"
 }
 
-suffix="i"
+suffix="j3"
 ddir="data/control-1e7"
 cdir="/scratch/dsc7746/cases"
 
@@ -18,11 +18,12 @@ kinds=(
 )
 
 models=(
+    mubofo-wind
     mubofo-wind-T
     mubofo-wind-Nsq
     mubofo-wind-shear
     mubofo-shear-Nsq
-    # mubofo-wind-Nsq-pca
+    mubofo-wind-Nsq-pca
 
     xgboost-wind-Nsq
     xgboost-wind-shear
@@ -30,6 +31,7 @@ models=(
     random-wind-Nsq
     random-wind-shear
 
+    WaveNet-wind
     WaveNet-wind-T
     WaveNet-wind-Nsq
 )
@@ -80,14 +82,17 @@ case $1 in
         ;;
 
     "plot-qbos")
-        use="${cdir}/control"
-        for model in "${models[@]}"; do
-            name="${model}-${suffix}"
-            use="${use},${cdir}/${name}"
-        done
+        for kind in "${kinds[@]}"; do
+            use="${cdir}/control"
+            for model in "${models[@]}"; do
+                if [[ $model == ${kind}-* ]]; then
+                    use="${use},${cdir}/${model}-${suffix}"
+                fi
+            done
 
-        args="${use} plots/qbos/qbos-${suffix}.png"
-        python -m willow plot-qbos ${args}
+            args="${use} plots/qbos/${kind}-qbos-${suffix}.png"
+            python -m willow plot-qbos ${args}
+        done
         ;;
 
     *)

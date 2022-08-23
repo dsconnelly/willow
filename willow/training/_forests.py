@@ -62,7 +62,7 @@ def train_scikit_forest(data_dir, model_dir):
         def model_class(**kwargs):
             return make_pipeline(
                 StandardScaler(),
-                PCA(n_components=0.8),
+                PCA(n_components=0.9),
                 estimator_class(**kwargs)
             )
         
