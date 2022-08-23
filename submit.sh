@@ -6,7 +6,7 @@ python () {
         "source /ext3/activate.sh; ${cmd}"
 }
 
-suffix="j3"
+suffix=$1
 ddir="data/control-1e7"
 cdir="/scratch/dsc7746/cases"
 
@@ -36,7 +36,7 @@ models=(
     WaveNet-wind-Nsq
 )
 
-case $1 in
+case $2 in
 
     "train")
         for model in "${models[@]}"; do
@@ -96,7 +96,7 @@ case $1 in
         ;;
 
     *)
-        echo "unknown command $1"
+        echo "unknown command $2"
         ;;
         
 esac
