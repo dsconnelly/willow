@@ -109,7 +109,7 @@ def _submit_modifier(line, control_dir, case_dir, model_name):
     if 'mv RESTART/* INPUT' in line:
         lines = [
             '    ' + line.strip(), '',
-            '    cdo --reduce-dim \\',
+            '    cdo --reduce_dim \\',
             '        -daymean -zonmean -mermean \\',
             '        -sellonlatbox,0.0,360.0,-5.0,5.0 \\',
             '        -selname,u_gwf \\',
