@@ -10,9 +10,9 @@ from sklearn.ensemble import RandomForestRegressor
 from torch.nn import Module
 from xgboost import Booster
 
-def combine_by_level(scores):
+def get_level_data(scores, level):
     """
-    Combine Shapley values corresponding to input from the same pressure level.
+    Get Shapley values for each input profile at a particular level.
 
     Parameters
     ----------
@@ -20,26 +20,32 @@ def combine_by_level(scores):
         The precomputed Shapley values. Should have pressure and feature
         coordinates, and the feature coordinates should have their corresponding
         pressures preceded by the @ symbol.
+    level : float
+        The output pressure level. The Shapley values for the pressure level in
+        the dataset closest to level will be returned.
 
     Returns
     -------
-    combined : dict
-        The dictionary of combined Shapley values, with a key for each pressure
-        level found in the feature names in scores (as a string).
+    k : int
+        The index of the closest pressure level to level.
+    profiles : dict
+        A dictionary whose keys are the input profiles included in the dataset
+        (e.g. 'wind', 'T') and whose values are arrays of Shapley values.
 
     """
 
-    n_pressures = len(scores['pressure'])
-    combined = defaultdict(lambda: np.zeros(n_pressures))
+    k = abs(scores['pressure'].values - level).argmin()
+    scores = scores.isel(pressure=k)
 
-    for feature in scores['feature'].values:
+    profiles = defaultdict(list)
+    for feature, score in zip(scores['feature'].values, scores.values):
         if '@' not in feature:
             continue
 
-        p = feature.split('@')[-1].split()[0]
-        combined[p] += scores.sel(feature=feature).values
+        name = feature.split(' @ ')[0]
+        profiles[name].append(score)
 
-    return dict(combined)
+    return k, {name : np.array(v) for name, v in profiles.items()}
 
 def compute_shapely_values(samples, model):
     """

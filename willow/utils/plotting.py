@@ -24,13 +24,13 @@ def format_latitude(lat):
 
     """
 
-    suffix = '$^\circ$'
+    suffix = ''
     if lat < 0:
         suffix = 'S'
     elif lat > 0:
         suffix = 'N'
         
-    return f'{int(abs(lat))}{suffix}'
+    return f'{int(abs(lat))}$^\circ${suffix}'
 
 def format_pressure(p):
     """

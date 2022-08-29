@@ -8,7 +8,7 @@ import xarray as xr
 from ..utils.datasets import load_datasets, prepare_datasets
 from ..utils.diagnostics import logs, times
 from ..utils.plotting import format_pressure
-from ..utils.shapley import combine_by_level, compute_shapely_values
+from ..utils.shapley import compute_shapely_values, get_level_data
 
 @logs
 @times
@@ -28,9 +28,6 @@ def plot_shapley_values(model_dir, output_dir, data_dir=None):
         containing precomputed Shapley values.
 
     """
-
-    import logging
-    logging.info = print
 
     model_name = os.path.basename(model_dir)
     shap_path = os.path.join(model_dir, 'shapley.nc')
@@ -53,6 +50,12 @@ def plot_shapley_values(model_dir, output_dir, data_dir=None):
     level_path = os.path.join(output_dir, f'{model_name}-by-level.png')
     _plot_by_level(scores, level_path)
 
+_colormap = {
+    'wind' : 'royalblue',
+    'T' : 'tab:red',
+    'Nsq' : 'seagreen'
+}
+
 def _plot_by_level(scores, output_path):
     levels = [200, 25, 1]
     fig, axes = plt.subplots(ncols=len(levels))
@@ -61,29 +64,39 @@ def _plot_by_level(scores, output_path):
     pressures = [format_pressure(p) for p in scores['pressure'].values]
     y = np.arange(len(pressures))
 
-    data = combine_by_level(abs(scores).mean('sample'))
+    scores = abs(scores).mean('sample')
     for j, (level, ax) in enumerate(zip(levels, axes)):
-        k = abs(scores['pressure'].values - level).argmin()
-        p = str(pressures[k])
-        widths = data[p] / (1.02 * data[p].max())
+        k, data = get_level_data(scores, level)
+        p = pressures[k]
 
         ax = _setup_level_axis(ax, pressures, y, set_ylabel=(j == 0))
-        ax.barh(
-            -y, widths,
-            height=1,
-            color='darkgray',
-            edgecolor='k',
-            alpha=0.3
-        )[k].set_alpha(1)
-
         ax.set_title(f'predictions @ {p} hPa')
+
+        left = np.zeros(len(pressures))
+        for name, widths in data.items():
+            color = _colormap[name]
+            ax.barh([0], [0], color=color, label=name)
+
+            ax.barh(
+                -y, widths,
+                height=1,
+                color=color,
+                edgecolor='k',
+                alpha=0.3,
+                left=left
+            )[k].set_alpha(1)
+
+            left = left + widths
+
+        if j == 0:
+            ax.legend()
 
     plt.tight_layout()
     plt.savefig(output_path, dpi=400)
     plt.clf()
         
 def _setup_level_axis(ax, pressures, y, set_ylabel=True):
-    ax.set_xlim(0, 1)
+    ax.set_xlim(0, 5)
     ax.set_ylim(-y[-1] - 0.5, -y[0] + 0.5)
 
     ax.set_yticks(-y[::3])

@@ -81,6 +81,16 @@ case $2 in
         done
         ;;
 
+    "plot-profiling")
+        use="${cdir}/profiling"
+        for model in "${models[@]}"; do
+            use="${use},${cdir}/${model}-${suffix}"
+        done
+
+        args="${use} plots/profiling/profiling-${suffix}.png"
+        python -m willow plot-online-profiling ${args}
+        ;;
+
     "plot-qbos")
         for kind in "${kinds[@]}"; do
             use="${cdir}/control"
