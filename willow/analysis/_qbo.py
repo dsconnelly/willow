@@ -6,7 +6,7 @@ import numpy as np
 import xarray as xr
 
 from ..utils.qbo import load_qbo, qbo_statistics
-from ..utils.plotting import format_pressure
+from ..utils.plotting import format_pressure, get_bounds_and_cmap, get_units
 
 def plot_qbos(case_dirs, output_path):
     """
@@ -43,7 +43,7 @@ def plot_qbos(case_dirs, output_path):
                 axes.append(fig.add_subplot(gs[i, j]))
 
     data = {os.path.basename(s) : load_qbo(s, n_years=12) for s in case_dirs}
-    vmax = max([abs(u).max() for _, u in data.items()])
+    vmin, vmax, cmap = get_bounds_and_cmap('u', data)
 
     for (name, u), ax in zip(data.items(), axes):
         years = u.time / 360
@@ -52,9 +52,9 @@ def plot_qbos(case_dirs, output_path):
 
         img = ax.contourf(
             years, -ys, u.T, 
-            vmin=(-vmax), 
+            vmin=vmin, 
             vmax=vmax,
-            cmap='RdBu_r',
+            cmap=cmap,
             levels=15
         )
 
@@ -68,8 +68,9 @@ def plot_qbos(case_dirs, output_path):
         info = f'{period:.2f} month period, {amp:.2f} m s$^{{-1}}$ amplitude'
         ax.set_title(f'{name} \u2014 {info}')
 
+    units = get_units('u')
     cbar = plt.colorbar(img, cax=cax, orientation='horizontal')
-    cbar.set_label('zonal mean tropical $u$ (m s$^{-1}$)')
+    cbar.set_label(f'zonal mean tropical $u$ ({units})')
 
     plt.savefig(output_path, dpi=400)
         

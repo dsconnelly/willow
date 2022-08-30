@@ -4,6 +4,8 @@ import numpy as np
 import scipy.signal as signal
 import xarray as xr
 
+from .mima import get_fnames
+
 def load_qbo(case_dir, n_years=24):
     """
     Load the QBO signal from a MiMA run with yearly output subdirectories.
@@ -34,9 +36,7 @@ def load_qbo(case_dir, n_years=24):
             u = u.assign_coords(time=u['time'].astype(int))
 
     else:
-        years = sorted([s for s in os.listdir(case_dir) if s.isdigit()])
-        fnames = [os.path.join(case_dir, y, 'atmos_4xdaily.nc') for y in years]
-
+        fnames = get_fnames(case_dir)
         with xr.open_mfdataset(fnames[-n_years:], decode_times=False) as ds:
             u = ds['u_gwf'].sel(pfull=slice(None, 115)).sel(lat=slice(-5, 5))
             u = u.groupby(u['time'].astype(int)).mean(('time', 'lat', 'lon'))

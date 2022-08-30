@@ -15,6 +15,6 @@ if __name__ == '__main__':
         plot_offline_scores,
         plot_shapley_values,
         plot_online_profiling,
-        plot_climatology,
+        plot_climatologies,
         plot_qbos
     ]).run()
