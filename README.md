@@ -3,17 +3,20 @@
 At present, `willow` provides straightforward and well-documented functions for training emulators, running them online in [MiMA](https://github.com/mjucker/MiMA), and conducting various analyses of offline and online performance. Usage help can be displayed from the command line.
 ```console
 $ python -m willow -h
-usage: __main__.py [-h] {make-datasets,train-emulator,setup-mima,plot-offline-scores,plot-shapley-values,plot-qbos} ...
+usage: __main__.py [-h] {make-datasets,train-emulator,setup-mima,plot-offline-scores,plot-feature-importances,plot-online-profiling,plot-climatologies,plot-qbos} ...
 
 positional arguments:
-  {make-datasets,train-emulator,setup-mima,plot-offline-scores,plot-shapley-values,plot-qbos}
+  {make-datasets,train-emulator,setup-mima,plot-offline-scores,plot-feature-importances,plot-online-profiling,plot-climatologies,plot-qbos}
     make-datasets       Read MiMA output data and save training and test sets.
     train-emulator      Train a forest or neural network emulator.
     setup-mima          Set up a MiMA run with an emulator for online testing.
     plot-offline-scores
                         Plot training and test R-squared scores by level and latitude.
-    plot-shapley-values
-                        Plot model Shapley values by pressure and QBO phase.
+    plot-feature-importances
+                        Plot model feature importances by vertical level.
+    plot-online-profiling
+                        Plot online runtime of gravity wave drag parameterizations.
+    plot-climatologies  Plot climatological means of outputs from MiMA runs.
     plot-qbos           Plot quasi-biennial oscillations from one or more MiMA runs.
 
 optional arguments:

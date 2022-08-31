@@ -1,6 +1,7 @@
 from collections import defaultdict
 
 import numpy as np
+import pandas as pd
 import torch
 import xarray as xr
 
@@ -47,7 +48,54 @@ def get_level_data(scores, level):
 
     return k, {name : np.array(v) for name, v in profiles.items()}
 
-def compute_shapely_values(samples, model):
+def compute_gini_scores(samples, model):
+    """
+    Compute Gini importances for tree-based model architectures.
+
+    Parameters
+    ----------
+    samples : pandas.DataFrame
+        A DataFrame of input samples containing only the features used by the
+        provided model.
+    model : BoostedForestRegressor or RandomForestRegressor
+        The model for which to compute the Gini importances.
+
+    Returns
+    -------
+    scores : pd.DataFrame
+        A DataFrame whose columns are the input profiles included in the dataset
+        (e.g. 'wind', 'T'), index giving the pressure levels, and data giving
+        the Gini importanes.
+
+    """
+
+    features = samples.columns
+    idxs, pressures = defaultdict(list), set()
+
+    for i, feature in enumerate(features):
+        if '@' not in feature:
+            continue
+
+        name, pressure = feature.split(' @ ')
+        pressure = pressure.split()[0]
+
+        idxs[name].append(i)
+        pressures.add(pressure)
+
+    pressures = sorted(pressures, key=float)
+    profiles = {name : np.zeros(len(pressures)) for name in idxs}
+
+    for tree in model.estimators_:
+        for name, idx in idxs.items():
+            profiles[name] += tree.feature_importances_[idx]
+
+    n_trees = len(model.estimators_)
+    for name, profile in profiles.items():
+        profiles[name] = profile / n_trees
+
+    return pd.DataFrame(profiles, index=pressures)
+
+def compute_shapley_scores(samples, model):
     """
     Compute Shapley values for various model architectures.
 

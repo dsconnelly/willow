@@ -13,7 +13,7 @@ if __name__ == '__main__':
         train_emulator,
         setup_mima,
         plot_offline_scores,
-        plot_shapley_values,
+        plot_feature_importances,
         plot_online_profiling,
         plot_climatologies,
         plot_qbos
