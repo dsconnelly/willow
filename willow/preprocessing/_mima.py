@@ -44,11 +44,15 @@ def make_datasets(case_dir, output_dir, n_samples=int(5e6)):
             for component in ['u', 'v']:
                 wind = ds[f'{component}_gwf'].values
                 shear = wind[:, :-1] - wind[:, 1:]
+
+                N = ds['bf_cgwd'].values
+                zero_cols = N.min(axis=0) == 0
+                N[:, zero_cols] = 0
                 
                 Xs.append(np.hstack((
                     wind, shear,
-                    ds['t_gwf'].values,
-                    ds['bf_cgwd'].values,
+                    ds['t_gwf'].values, N,
+                    # ds['bf_cgwd'].values,
                     ds['ps'].values.reshape(-1, 1),
                     ds['lat'].values.reshape(-1, 1)
                 )))

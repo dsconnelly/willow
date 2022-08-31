@@ -64,6 +64,31 @@ _colormap = {
     'Nsq' : 'seagreen'
 }
 
+def _plot_by_level(ax, pressures, data, verbose):
+    y = np.arange(len(pressures))
+    left = np.zeros(len(pressures))
+    ax = _setup_level_axis(ax, pressures, y, verbose)
+
+    imgs = []
+    for name, widths in data.items():
+        color = _colormap[name]
+        ax.barh([0], [0], color=color, label=name)
+
+        imgs.append(ax.barh(
+            -y, widths,
+            height=1,
+            color=color,
+            edgecolor='k',
+            left=left
+        ))
+
+        left = left + widths
+
+    if verbose:
+        ax.legend()
+
+    return imgs
+
 def _plot_gini_scores(model_name, scores, output_dir):
     pressures = scores.index
     y = np.arange(len(pressures))
@@ -102,31 +127,6 @@ def _plot_shapley_scores(model_name, scores, output_dir):
 
     fname = f'{model_name}-shapley-by-level.png'
     plt.savefig(os.path.join(output_dir, fname))
-
-def _plot_by_level(ax, pressures, data, verbose):
-    y = np.arange(len(pressures))
-    left = np.zeros(len(pressures))
-    ax = _setup_level_axis(ax, pressures, y, verbose)
-
-    imgs = []
-    for name, widths in data.items():
-        color = _colormap[name]
-        ax.barh([0], [0], color=color, label=name)
-
-        imgs.append(ax.barh(
-            -y, widths,
-            height=1,
-            color=color,
-            edgecolor='k',
-            left=left
-        ))
-
-        left = left + widths
-
-    if verbose:
-        ax.legend()
-
-    return imgs
 
 def _setup_level_axis(ax, pressures, y, set_ylabel):
     ax.set_ylim(-y[-1] - 0.5, -y[0] + 0.5)
