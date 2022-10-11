@@ -85,7 +85,6 @@ def train_xgboost_forest(data_dir, model_dir):
     logging.info(f'Training an xgboost model.')
 
     params = {
-        #'max_depth' : _MAX_DEPTH,
         'max_depth' : 5,
         'eta' : _LEARNING_RATE,
         'subsample' : _MAX_SAMPLES,
@@ -99,7 +98,6 @@ def train_xgboost_forest(data_dir, model_dir):
         params, data_tr,
         num_boost_round=_N_TREES,
         evals=[(data_va, 'val')],
-        #early_stopping_rounds=_PATIENCE,
         early_stopping_rounds=5
     )
     

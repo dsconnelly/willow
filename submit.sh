@@ -7,8 +7,9 @@ python () {
 }
 
 suffix=$1
-ddir="data/control-1e7"
+ddir="data/ad99-control-1e7"
 cdir="/scratch/dsc7746/cases"
+perturb=""
 
 kinds=(
     mubofo
@@ -23,17 +24,18 @@ models=(
     mubofo-wind-Nsq
     mubofo-wind-shear
     mubofo-shear-Nsq
-    mubofo-wind-Nsq-pca
+    mubofo-wind-T-noloc
 
-    xgboost-wind-Nsq
+    xgboost-wind-T
     xgboost-wind-shear
 
-    random-wind-Nsq
+    random-wind-T
     random-wind-shear
 
     WaveNet-wind
     WaveNet-wind-T
     WaveNet-wind-Nsq
+    WaveNet-wind-T-noloc
 )
 
 case $2 in
@@ -55,19 +57,19 @@ case $2 in
                 fi
             done
 
-            fname="plots/offline-scores/${kind}-${suffix}-scores.png"
+            fname="plots/sparc-fall-22/scores/${kind}-${suffix}-scores.png"
             args="${ddir} ${use%?} ${fname}"
             python -m willow plot-offline-scores ${args}
         done
         ;;
 
     "plot-shapley")
-        odir="plots/shapley"
+        odir="plots/sparc-fall-22/shapley"
         for model in "${models[@]}"; do
             name="${model}-${suffix}"
-            cmd="plot-shapley-values"
+            cmd="plot-feature-importances"
             
-            args="${cmd} models/${name} ${odir} --data-dir ${ddir}"
+            args="${cmd} models/${name} ${odir} shapley --data-dir ${ddir}"
             sbatch -J "${name}-shapley" willow.slurm ${args}
         done
         ;;
@@ -75,9 +77,11 @@ case $2 in
     "online")
         for model in "${models[@]}"; do
             name="${model}-${suffix}"
-            args="setup-mima ${cdir}/control models/${name}"
-            python -m willow ${args}
-            sbatch "${cdir}/${name}/submit.slurm"
+            newcase="${cdir}/${name}-${perturb}"
+            
+            args="setup-mima ${cdir}/ad99-${perturb} models/${name}"
+            python -m willow ${args} --case-dir ${newcase}
+            sbatch "${newcase}/submit.slurm"
         done
         ;;
 
@@ -93,15 +97,29 @@ case $2 in
 
     "plot-qbos")
         for kind in "${kinds[@]}"; do
-            use="${cdir}/control"
+            use="${cdir}/ad99-${perturb}"
             for model in "${models[@]}"; do
                 if [[ $model == ${kind}-* ]]; then
-                    use="${use},${cdir}/${model}-${suffix}"
+                    use="${use},${cdir}/${model}-${suffix}-${perturb}"
                 fi
             done
 
-            args="${use} plots/qbos/${kind}-qbos-${suffix}.png"
+            args="${use} plots/sparc-fall-22/qbos/${kind}-qbos-${suffix}-${perturb}.png"
             python -m willow plot-qbos ${args}
+        done
+        ;;
+
+    "plot-ssws")
+        for kind in "${kinds[@]}"; do
+            use="${cdir}/ad99-${perturb}"
+            for model in "${models[@]}"; do
+                if [[ $model == ${kind}-* ]]; then
+                    use="${use},${cdir}/${model}-${suffix}-${perturb}"
+                fi
+            done
+
+            args="${use} plots/ssws/${kind}-ssws-${suffix}-${perturb}.png"
+            python -m willow plot-ssws ${args}
         done
         ;;
 

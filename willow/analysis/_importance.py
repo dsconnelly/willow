@@ -5,128 +5,179 @@ import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
 
+from ..utils.ad99 import AlexanderDunkerton
 from ..utils.datasets import load_datasets, prepare_datasets
 from ..utils.diagnostics import logs, times
-from ..utils.plotting import format_pressure
-from ..utils.importance import (
-    compute_gini_scores,
-    compute_shapley_scores,
-    get_level_data
-)
+from ..utils.plotting import colors, format_name, format_pressure
+from ..utils.importance import get_level_data, get_shapley_scores
 
 @logs
 @times
-def plot_feature_importances(model_dir, output_dir, kind, data_dir=None):
+def save_shapley_scores(model_dir, data_dir):
     """
-    Plot model feature importances by vertical level.
+    Compute and save Shapley values for plotting later.
 
     Parameters
     ----------
     model_dir : str
-        The directory where the trained model is saved.
-    output_dir : str
-        The directory where plots should be saved.
-    kind : str
-        The kind of feature importance to use. Must be in {'shapley', 'gini'},
-        and 'gini' can only be used for models built on scikit-learn trees.
+        Directory where the trained model is saved, and where the Shapley values
+        will be saved. If model_dir starts with 'ad99', the Shapley values of
+        AlexanderDunkerton.predict will be saved instead.
     data_dir : str
-        The directory where the input data is saved, if Shapley values are to be
-        recomputed. If None, model_dir should contain an array shapley.npy
-        containing precomputed Shapley values.
+        Directory where input data is saved.
 
     """
 
     model_name = os.path.basename(model_dir)
-    if data_dir is not None:
-        X, Y = load_datasets(data_dir, 'tr', 5000)
-        samples, _ = prepare_datasets(X, Y, model_name, as_array=False)
+    X, Y = load_datasets(data_dir, 'tr', 5000)
+    samples, Y = prepare_datasets(X, Y, model_name, as_array=False)
 
-        model_path = os.path.join(model_dir, 'model.pkl')
-        model = joblib.load(model_path).model
-
-        if kind == 'shapley':
-            ds = compute_shapely_scores(samples, model)
-            scores = abs(ds['scores']).mean('sample')
-            ds.to_netcdf(os.path.join(model_dir, 'shapley.nc'))
-
-        elif kind == 'gini':
-            scores = compute_gini_scores(samples, model)
+    if model_name.startswith('ad99'):
+        model = AlexanderDunkerton()
+        Y = Y.to_numpy()
 
     else:
+        model_path = os.path.join(model_dir, 'model.pkl')
+        model = joblib.load(model_path).model
+        Y = None
+
+    ds = get_shapley_scores(samples, model, Y)
+    ds.to_netcdf(os.path.join(model_dir, 'shapley.nc'))
+
+def plot_lmis(model_dirs, output_path):
+    """
+    Plot the Shapley levels of maximum importance for one or more models.
+
+    Parameters
+    ----------
+    model_dirs : list of str
+        Directories for models whose LMIs will be plotted. Each should contain
+        a shapley.nc file as created by save_shapley_scores.
+    output_path : str
+        Where to save the image.
+
+    """
+
+    data = {}
+    for model_dir in model_dirs:
+        name = format_name(os.path.basename(model_dir))
         with xr.open_dataset(os.path.join(model_dir, 'shapley.nc')) as ds:
-            scores = abs(ds['scores']).mean('sample')
+            data[name] = abs(ds['scores']).mean('sample')
 
-    globals()[f'_plot_{kind}_scores'](model_name, scores, output_dir)
-            
-_colormap = {
-    'wind' : 'royalblue',
-    'T' : 'tab:red',
-    'Nsq' : 'seagreen'
-}
-
-def _plot_by_level(ax, pressures, data, verbose):
-    y = np.arange(len(pressures))
-    left = np.zeros(len(pressures))
-    ax = _setup_level_axis(ax, pressures, y, verbose)
-
-    imgs = []
-    for name, widths in data.items():
-        color = _colormap[name]
-        ax.barh([0], [0], color=color, label=name)
-
-        imgs.append(ax.barh(
-            -y, widths,
-            height=1,
-            color=color,
-            edgecolor='k',
-            left=left
-        ))
-
-        left = left + widths
-
-    if verbose:
-        ax.legend()
-
-    return imgs
-
-def _plot_gini_scores(model_name, scores, output_dir):
-    pressures = scores.index
-    y = np.arange(len(pressures))
-    data = scores.to_dict('list')
-    
     fig, ax = plt.subplots()
-    fig.set_size_inches(3, 6)
+    fig.set_size_inches(6, 6)
 
-    _ = _plot_by_level(ax, pressures, data, True)
-    ax.set_xlim(0, 0.1)
+    use_colors = colors
+    if 'ad99' in model_dirs[0]:
+        use_colors = ['k'] + use_colors
+
+    for (name, scores), color in zip(data.items(), use_colors):
+        levels = scores.pressure.values[::-1]
+        xs = np.arange(len(levels))
+        ys = np.zeros(xs.shape)
+
+        for k, level in enumerate(levels[1:], start=1):
+            _, profiles = get_level_data(scores, level)
+            weights = sum(profile for _, profile in profiles.items())
+
+            weights = (weights / weights.sum())[::-1]
+            ys[k] = np.average(xs, weights=weights)
+
+        slope, _ = np.polyfit(xs[1:], ys[1:], deg=1)
+        ax.scatter(
+            xs[1:], ys[1:],
+            color=color,
+            zorder=2,
+            clip_on=False,
+            label=f'{name} (slope = {slope:.2f})'
+        )
+
+    ax.plot(xs, xs, color='k', ls='dashed', zorder=1)
+    ax.grid(color=(0.839, 0.839, 0.839), zorder=0)
+
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    
+    ax.set_xticks(xs[::3])
+    ax.set_yticks(xs[::3])
+
+    levels = [format_pressure(p) for p in levels]
+    ax.set_xticklabels(levels[::3], rotation=45)
+    ax.set_yticklabels(levels[::3])
+
+    ax.set_xlim(xs.min(), xs.max())
+    ax.set_ylim(xs.min(), xs.max())
+
+    ax.set_xlabel('prediction level (hPa)')
+    ax.set_ylabel('level of maximum importance (hPa)')
+    ax.legend(loc='lower right')
 
     plt.tight_layout()
+    plt.savefig(output_path, transparent=False)
 
-    fname = f'{model_name}-gini-by-level.png'
-    plt.savefig(os.path.join(output_dir, fname))
+def plot_shapley_scores(model_dir, output_path, levels=[200, 25, 1]):
+    """
+    Plot Shapley values for predictions at several levels.
 
-def _plot_shapley_scores(model_name, scores, output_dir):
-    levels = [200, 25, 1]
+    Parameters
+    ----------
+    model_dir : str
+        Directory containing a shapley.nc file, as created by 
+        save_shapley_scores, for the model in question.
+    output_path : str
+        Where to save the image.
+    levels : list of float
+        Pressure levels (in hPa) of predictions to plot.
+
+    """
+
+    with xr.open_dataset(os.path.join(model_dir, 'shapley.nc')) as ds:
+        scores = abs(ds['scores']).mean('sample')
+        pressures = [format_pressure(p) for p in scores['pressure'].values]
+
     fig, axes = plt.subplots(ncols=len(levels))
     fig.set_size_inches(3 * len(levels), 6)
 
-    pressures = [format_pressure(p) for p in scores['pressure'].values]
-    for j, (level, ax) in enumerate(zip(levels, axes)):
-        k, data = get_level_data(scores, level)
-        imgs = _plot_by_level(ax, pressures, data, verbose=(j == 0))
+    xmax = -np.inf
+    y = np.arange(len(pressures))
 
-        ax.set_xlim(0, 5)
+    for j, (level, ax) in enumerate(zip(levels, axes)):
+        ax = _setup_level_axis(ax, pressures, y, set_ylabel=(j == 0))
+        k, data = get_level_data(scores, level)
+
+        left = np.zeros(y.shape)
+        for name, widths in data.items():
+            color = _colormap[name]
+            ax.barh([0], [0], color=color, label=name)
+
+            ax.barh(
+                -y, widths,
+                height=1,
+                color=color,
+                edgecolor='k',
+                left=left,
+                alpha=0.3
+            )[k].set_alpha(1)
+
+            left = left + widths
+
+        if j == 0:
+            ax.legend()
+
+        xmax = max(xmax, left.max())
         ax.set_title(f'predictions @ {pressures[k]} hPa')
 
-        for img in imgs:
-            for i, bar in enumerate(img):
-                if i != k:
-                    bar.set_alpha(0.3)
+    xmax = 1.2 * xmax
+    xticks = np.linspace(0, xmax, 6)
+
+    for ax in axes:
+        ax.set_xlim(0, xmax)
+        ax.set_xticks(xticks)
 
     plt.tight_layout()
-
-    fname = f'{model_name}-shapley-by-level.png'
-    plt.savefig(os.path.join(output_dir, fname))
+    plt.savefig(output_path, transparent=False)
+            
+_colormap = {v : c for v, c in zip(['wind', 'T', 'Nsq', 'shear'], colors)}
 
 def _setup_level_axis(ax, pressures, y, set_ylabel):
     ax.set_ylim(-y[-1] - 0.5, -y[0] + 0.5)

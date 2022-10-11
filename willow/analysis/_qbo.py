@@ -6,7 +6,12 @@ import numpy as np
 import xarray as xr
 
 from ..utils.qbo import load_qbo, qbo_statistics
-from ..utils.plotting import format_pressure, get_bounds_and_cmap, get_units
+from ..utils.plotting import (
+    format_name,
+    format_pressure,
+    get_bounds_and_cmap,
+    get_units
+)
 
 def plot_qbos(case_dirs, output_path):
     """
@@ -15,15 +20,17 @@ def plot_qbos(case_dirs, output_path):
     Parameters
     ----------
     case_dirs : list of str
-        The directories of the MiMA runs with QBOs to be plotted.
+        Directories of the MiMA runs with QBOs to be plotted.
     output_path : str
         Path where the plot should be saved.
 
     """
 
+    plots_per_col = 4
+
     n_qbos = len(case_dirs)
-    n_rows = min(n_qbos, 3)
-    n_cols = (n_qbos + 2) // 3
+    n_rows = min(n_qbos, plots_per_col)
+    n_cols = (n_qbos + plots_per_col - 1) // plots_per_col
 
     cbar_scale = 0.1
     fig = plt.figure(constrained_layout=True)
@@ -64,13 +71,29 @@ def plot_qbos(case_dirs, output_path):
         ax.set_xlabel('year')
         ax.set_ylabel('p (hPa)')
 
-        period, _, amp, _ = qbo_statistics(u)
-        info = f'{period:.2f} month period, {amp:.2f} m s$^{{-1}}$ amplitude'
-        ax.set_title(f'{name} \u2014 {info}')
+        period, period_err, amp, amp_err = qbo_statistics(u)
+        info = (
+            f'{period:.1f} $\pm$ {period_err:.1f} month period\n'
+            f'{amp:.1f} $\pm$ {amp_err:.1f} m s$^{{-1}}$ amplitude'
+        )
+
+        ax.set_title(format_name(name))
+        ax.text(
+            0.85, 0.17, info,
+            ha='center',
+            va='center',
+            transform=ax.transAxes,
+            bbox=dict(
+                edgecolor='k',
+                facecolor='w',
+                boxstyle='round',
+                alpha=0.8
+            )
+        )
 
     units = get_units('u')
     cbar = plt.colorbar(img, cax=cax, orientation='horizontal')
     cbar.set_label(f'zonal mean tropical $u$ ({units})')
 
-    plt.savefig(output_path, dpi=400)
+    plt.savefig(output_path, bbox_inches='tight')
         

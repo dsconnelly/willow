@@ -90,28 +90,45 @@ def _apply_butterworth(u):
 def _qbo_amplitude(u, level=20):
     return _std_with_error(u.sel(pfull=level, method='nearest').values)
 
-def _qbo_period(u, level=27):
-    u = u.sel(pfull=level, method='nearest').values
-    u_hat = np.fft.fft(u, n=int(2.5e6))
+def _qbo_period(u, level=10, method='crossings'):
+    u = u.sel(pfull=level, method='nearest')
+    
+    if method == 'crossings':
+        crossings = (u.values[:-1] < 0) & (u.values[1:] > 0)
+        days = u['time'].values[:-1][crossings]
+        periods = (days[1:] - days[:-1]) / 30
 
-    freqs = np.fft.fftfreq(u_hat.shape[0])
-    idx = (freqs > 0) & (freqs >= 1 / len(u))
+        return periods.mean(), periods.std()
 
-    powers = abs(u_hat[idx])
-    periods = (1 / freqs[idx]) / 30
+    elif method == 'fourier':
+        u_hat = np.fft.fft(u, n=int(2.5e6))
+        freqs = np.fft.fftfreq(u_hat.shape[0])
+        idx = (freqs > 0) & (freqs >= 1 / len(u))
 
-    k = powers.argmax()
-    period = periods[k]
-    half_max = powers[k] / 2
+        powers = abs(u_hat[idx])
+        periods = (1 / freqs[idx]) / 30
 
-    starts, = np.where((powers[:-1] < half_max) & (powers[1:] > half_max))
-    ends, = np.where((powers[:-1] > half_max) & (powers[1:] < half_max))
-    start, end = starts[starts < k][-1], ends[ends > k][0]
+        k = powers.argmax()
+        period = periods[k]
+        half_max = powers[k] / 2
 
-    left, right = periods[start], periods[end]
-    error = max(left - period, period - right)
+        starts, = np.where((powers[:-1] < half_max) & (powers[1:] > half_max))
+        ends, = np.where((powers[:-1] > half_max) & (powers[1:] < half_max))
+        starts, ends = starts[starts < k], ends[ends > k]
 
-    return period, error
+        left = np.nan
+        if len(starts) > 0:
+            left = periods[starts[-1]]
+
+        right = np.nan
+        if len(ends) > 0:
+            right = periods[ends[0]]
+
+        error = np.nanmax([left - period, period - right])
+
+        return period, error
+
+    raise ValueError(f'Unknown method for QBO period {method}')
 
 def _std_with_error(a, confidence=0.95, n_resamples=int(1e4)):
     stds = np.zeros(n_resamples)

@@ -4,8 +4,9 @@ colors = [
     'tab:red',
     'royalblue',
     'forestgreen',
-    'darkviolet',
-    'darkorange'
+    (0.341, 0.024, 0.549),
+    'darkorange',
+    'hotpink'
 ]
 
 def format_latitude(lat):
@@ -32,7 +33,44 @@ def format_latitude(lat):
     elif lat > 0:
         suffix = 'N'
         
-    return f'{int(abs(lat))}$^\circ${suffix}'
+    return f'$\mathregular{{ {int(abs(lat))}^o {suffix} }}$'
+
+def format_name(name, simple=True):
+    """
+    Parse the name of a MiMA run for displaying in plots.
+
+    Parameters
+    ----------
+    name : str
+        The name of the run.
+    simple : bool
+        If True, the formatted name will just identify the model architecture.
+
+    Returns
+    -------
+    name : str
+        The formatted name, with trailing suffixes and perturbations removed.
+
+    """
+
+    if not simple:
+        name_parts = name.split('-')
+        perturbations = ['control', '4xco2', 'o3hole']
+        is_valid = lambda s: len(s) > 1 and s not in perturbations
+
+        return '-'.join(filter(is_valid, name_parts))
+
+    if 'ad99' in name:
+        return 'AD99'
+
+    if 'mubofo' in name:
+        return 'boosted forest'
+
+    if 'random' in name:
+        return 'random forest'
+
+    if 'WaveNet' in name:
+        return 'neural network'
 
 def format_pressure(p):
     """

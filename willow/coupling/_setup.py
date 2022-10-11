@@ -110,11 +110,17 @@ def _submit_modifier(line, control_dir, case_dir, model_name):
         lines = [
             '    ' + line.strip(), '',
             '    cdo --reduce_dim \\',
-            '        -daymean -zonmean -mermean \\',
-            '        -sellonlatbox,0.0,360.0,-5.0,5.0 \\',
+            '        -daymean -zonmean \\',
             '        -selname,u_gwf \\',
-            '        ${yy}/atmos_4xdaily.nc ${yy}/qbo.nc', '',
-            '    rm ${yy}/atmos_4xdaily.nc'
+            '        ${yy}/atmos_4xdaily.nc ${yy}/tmp.nc', ''
+            '    cdo --reduce_dim -mermean \\',
+            '        -sellonlatbox,0.0,360.0,-5.0,5.0 \\',
+            '        ${yy}/tmp.nc ${yy}/qbo.nc', ''
+            '    cdo -mermean \\',
+            '        -sellonlatbox,0.0,360.0,58.0,60.5 \\',
+            '        ${yy}/tmp.nc ${yy}/ssw.nc', '',
+            '    rm ${yy}/atmos_4xdaily.nc',
+            '    rm ${yy}/tmp.nc'
         ]
 
         return ''.join([s + '\n' for s in lines])
@@ -123,6 +129,7 @@ def _submit_modifier(line, control_dir, case_dir, model_name):
         lines = [
             line.strip(), '',
             'cdo mergetime ??/qbo.nc qbo.nc',
+            'cdo mergetime ??/ssw.nc ssw.nc',
             'for yy in {01..15}; do',
             '    rm -rf ${yy}',
             'done'
@@ -131,6 +138,3 @@ def _submit_modifier(line, control_dir, case_dir, model_name):
         return ''.join([s + '\n' for s in lines])
     
     return line
-    
-
-    

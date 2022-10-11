@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
+from ..utils.mima import get_fnames
 from ..utils.plotting import format_pressure
 
 def make_datasets(case_dir, output_dir, n_samples=int(5e6)):
@@ -22,10 +23,10 @@ def make_datasets(case_dir, output_dir, n_samples=int(5e6)):
 
     """
     
-    all_fnames = _get_fnames(case_dir)
+    all_fnames = get_fnames(case_dir, n_years=10)
     suffix_to_fnames = {
-        'tr' : all_fnames[-5:-1], 
-        'te' : all_fnames[-1]
+        'tr' : all_fnames[-8:-4],
+        'te' : all_fnames[-4:]
     }
     
     for suffix, fnames in suffix_to_fnames.items():
@@ -52,9 +53,9 @@ def make_datasets(case_dir, output_dir, n_samples=int(5e6)):
                 Xs.append(np.hstack((
                     wind, shear,
                     ds['t_gwf'].values, N,
-                    # ds['bf_cgwd'].values,
                     ds['ps'].values.reshape(-1, 1),
-                    ds['lat'].values.reshape(-1, 1)
+                    ds['lat'].values.reshape(-1, 1),
+                    ds['time'].values.reshape(-1, 1)
                 )))
                 
                 Ys.append(ds[f'gwf{component}_cgwd'].values)
@@ -66,8 +67,8 @@ def make_datasets(case_dir, output_dir, n_samples=int(5e6)):
                 profile_names('wind') +
                 profile_names('shear')[:-1] +
                 profile_names('T') +
-                profile_names('Nsq') +
-                ['surface pressure', 'latitude']
+                profile_names('N') +
+                ['surface pressure', 'latitude', 'time']
             )
             
             columns_Y = profile_names('drag')
@@ -81,13 +82,6 @@ def make_datasets(case_dir, output_dir, n_samples=int(5e6)):
             
             df_X.to_pickle(os.path.join(output_dir, f'X-{suffix}.pkl'))
             df_Y.to_pickle(os.path.join(output_dir, f'Y-{suffix}.pkl'))
-                
-def _get_fnames(case_dir):
-    is_year_dir = lambda f: f.is_dir() and f.name.isnumeric()
-    year_dirs = [f.path for f in os.scandir(case_dir) if is_year_dir(f)]
-    fnames = [f'{year_dir}/atmos_4xdaily.nc' for year_dir in year_dirs]
-    
-    return sorted(fnames)
 
 def _sample_dataset(ds, n_samples):
     ds = ds.stack(sample=('time', 'lat', 'lon'))
@@ -105,4 +99,4 @@ def _sample_dataset(ds, n_samples):
     ))
 
     return ds.isel(sample=idx)
-
+    

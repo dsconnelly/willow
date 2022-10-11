@@ -1,5 +1,9 @@
 import os
 
+R_dry = 287.04
+c_p = 7 * R_dry / 2
+grav = 9.8
+
 def get_fnames(case_dir, n_years=12):
     """
     Get the filenames corresponding to the last chunk of a MiMA run.
@@ -47,3 +51,5 @@ def get_mima_name(field):
 
     if field.startswith('gwd'):
         return f'gwf{field[-1]}_cgwd'
+
+    raise ValueError(f'Unknown field {field}')

@@ -1,3 +1,5 @@
+import warnings
+
 from collections import defaultdict
 
 import numpy as np
@@ -6,10 +8,13 @@ import torch
 import xarray as xr
 
 from mubofo import BoostedForestRegressor
-from shap import DeepExplainer, TreeExplainer
+from shap import DeepExplainer, KernelExplainer, TreeExplainer, kmeans
 from sklearn.ensemble import RandomForestRegressor
 from torch.nn import Module
 from xgboost import Booster
+
+from .ad99 import AlexanderDunkerton
+from .statistics import standardize
 
 def get_level_data(scores, level):
     """
@@ -46,56 +51,16 @@ def get_level_data(scores, level):
         name = feature.split(' @ ')[0]
         profiles[name].append(score)
 
-    return k, {name : np.array(v) for name, v in profiles.items()}
+    def handle(v):
+        out = np.array(v)
+        if len(out) == 39:
+            out = np.append(out, 0)
 
-def compute_gini_scores(samples, model):
-    """
-    Compute Gini importances for tree-based model architectures.
+        return out
 
-    Parameters
-    ----------
-    samples : pandas.DataFrame
-        A DataFrame of input samples containing only the features used by the
-        provided model.
-    model : BoostedForestRegressor or RandomForestRegressor
-        The model for which to compute the Gini importances.
+    return k, {name : handle(v) for name, v in profiles.items()}
 
-    Returns
-    -------
-    scores : pd.DataFrame
-        A DataFrame whose columns are the input profiles included in the dataset
-        (e.g. 'wind', 'T'), index giving the pressure levels, and data giving
-        the Gini importanes.
-
-    """
-
-    features = samples.columns
-    idxs, pressures = defaultdict(list), set()
-
-    for i, feature in enumerate(features):
-        if '@' not in feature:
-            continue
-
-        name, pressure = feature.split(' @ ')
-        pressure = pressure.split()[0]
-
-        idxs[name].append(i)
-        pressures.add(pressure)
-
-    pressures = sorted(pressures, key=float)
-    profiles = {name : np.zeros(len(pressures)) for name in idxs}
-
-    for tree in model.estimators_:
-        for name, idx in idxs.items():
-            profiles[name] += tree.feature_importances_[idx]
-
-    n_trees = len(model.estimators_)
-    for name, profile in profiles.items():
-        profiles[name] = profile / n_trees
-
-    return pd.DataFrame(profiles, index=pressures)
-
-def compute_shapley_scores(samples, model):
+def get_shapley_scores(samples, model, Y=None):
     """
     Compute Shapley values for various model architectures.
 
@@ -104,8 +69,11 @@ def compute_shapley_scores(samples, model):
     samples : pandas.DataFrame
         A DataFrame of input samples containing only the features used by the
         provided model.
-    model : BoostedForestRegressor or Booster or RandomForestRegressor or Module
+    model : various
         The model for which to compute the Shapley values.
+    Y : np.ndarray
+        Model outputs to be used for standardization. Only used if model is an
+        AlexanderDunkerton instance.
 
     Returns
     -------
@@ -118,7 +86,25 @@ def compute_shapley_scores(samples, model):
     features = samples.columns
     X = samples.to_numpy()
 
-    if isinstance(model, (BoostedForestRegressor)):
+    if isinstance(model, AlexanderDunkerton):
+        if Y is None:
+            raise ValueError('Must pass Y if model is AlexanderDunkerton')
+
+        means = Y.mean(axis=0)
+        stds = Y.std(axis=0)
+        f = lambda Z: standardize(model.predict(Z), means, stds)
+
+        background, X = X[:4000], X[-500:]
+        background = kmeans(background, 50)
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', category=FutureWarning)
+            warnings.filterwarnings('ignore', module='sklearn.linear_model')
+            
+            explainer = KernelExplainer(f, background)
+            scores = np.stack(explainer.shap_values(X, l1_reg=0))
+
+    if isinstance(model, BoostedForestRegressor):
         tree_scores = []
         for tree in model.estimators_:
             explainer = TreeExplainer(tree)

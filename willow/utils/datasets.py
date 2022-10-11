@@ -48,7 +48,8 @@ def prepare_datasets(X, Y, model_name, as_array=True, return_col_idx=False):
     model_name : str
         The name of the model being trained. It should be a hyphen-separated
         list of (potentially among other things) input variable names, which can
-        be 'wind', 'shear', 'T', and 'Nsq'.
+        be 'wind', 'shear', 'T', and 'Nsq'. Location variables (surface pressure
+        and latitude) will be included, unless 'noloc' is in the list.
     as_array : bool
         Whether the outputs should be cast from a pd.DataFrame to an array class
         (either a np.array or a torch.Tensor, depending on model_name).
@@ -61,18 +62,18 @@ def prepare_datasets(X, Y, model_name, as_array=True, return_col_idx=False):
     -------
     X, Y : np.ndarry or torch.Tensor
         The extracted input and output data. If The first hyphen-separated part
-        of model_name does not specify a kind of forest, the model is assumed to
-        be a torch model, and the outputs are cast as torch.Tensors.
+        of model_name does not specify AD99 or a kind of forest, the model is
+        assumed to be a torch model, and the outputs are cast as torch.Tensors.
 
     """
 
     name_parts = model_name.split('-')
-    keep, idx = _filter_columns(name_parts, X.columns)   
+    keep, idx = _filter_columns(set(name_parts), X.columns)
     X = X[keep]
     
     if as_array:          
         X, Y = X.to_numpy(), Y.to_numpy()
-        if name_parts[0] not in ['mubofo', 'random', 'xgboost']:
+        if name_parts[0] not in ['ad99', 'mubofo', 'random', 'xgboost']:
             X, Y = torch.tensor(X), torch.tensor(Y)
         
     if return_col_idx:
@@ -81,8 +82,9 @@ def prepare_datasets(X, Y, model_name, as_array=True, return_col_idx=False):
     return X, Y
 
 def _filter_columns(name_parts, columns):
-    allowed = {'wind', 'shear', 'T', 'Nsq'} & set(name_parts)
-    allowed = allowed | {'pressure', 'latitude'}
+    allowed = {'wind', 'shear', 'T', 'Nsq'} & name_parts
+    if 'noloc' not in name_parts:
+        allowed = allowed | {'pressure', 'latitude'}
 
     keep, idx = [], []
     for i, column in enumerate(columns):

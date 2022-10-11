@@ -6,7 +6,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from ..utils.datasets import load_datasets, prepare_datasets
-from ..utils.plotting import colors, format_latitude, format_pressure
+from ..utils.plotting import (
+    colors,
+    format_latitude,
+    format_name,
+    format_pressure
+)
 from ..utils.statistics import R_squared
 
 def plot_offline_scores(data_dir, model_dirs, output_path):
@@ -43,7 +48,7 @@ def plot_offline_scores(data_dir, model_dirs, output_path):
         }
             
     fig = plt.figure(constrained_layout=True)
-    fig.set_size_inches(12, 8)
+    fig.set_size_inches(8, 16 / 3)
     
     gs = gridspec.GridSpec(ncols=2, nrows=1, width_ratios=[1, 2], figure=fig)
     axes = [fig.add_subplot(gs[0, i]) for i in range(2)]
@@ -54,19 +59,19 @@ def plot_offline_scores(data_dir, model_dirs, output_path):
     
     ax = _setup_lev_axis(axes[0], pressures, y)
     for color, (model_name, scores) in zip(colors, scores_by_lev.items()):
-        ax.plot(scores['tr'], -y, color=color, label=model_name)
+        ax.plot(scores['tr'], -y, color=color)
         ax.plot(scores['te'], -y, color=color, ls='dashed')
         
     ax = _setup_lat_axis(axes[1])
     for color, (model_name, scores) in zip(colors, scores_by_lat.items()):
-        ax.plot(lats, scores['tr'], color=color, label=model_name)
+        ax.plot(lats, scores['tr'], color=color, label=format_name(model_name))
         ax.plot(lats, scores['te'], color=color, ls='dashed')
 
     ax.plot([], [], color='gray', label='training')
     ax.plot([], [], color='gray', ls='dashed', label='test')
     ax.legend()
        
-    plt.savefig(output_path, dpi=400)
+    plt.savefig(output_path)
 
 def _get_scores_by_lev(X, Y, model):
     X, Y = prepare_datasets(X, Y, model.name)
