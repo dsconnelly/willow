@@ -71,6 +71,7 @@ def plot_lmis(model_dirs, output_path):
     if 'ad99' in model_dirs[0]:
         use_colors = ['k'] + use_colors
 
+    k_lo, k_hi = 11, 37
     for (name, scores), color in zip(data.items(), use_colors):
         levels = scores.pressure.values[::-1]
         xs = np.arange(len(levels))
@@ -80,10 +81,14 @@ def plot_lmis(model_dirs, output_path):
             _, profiles = get_level_data(scores, level)
             weights = sum(profile for _, profile in profiles.items())
 
-            weights = (weights / weights.sum())[::-1]
+            weights = weights[::-1]
+            if 'AD99' in name:
+                weights[(k + 2):] = 0
+
+            weights = (weights / weights.sum())
             ys[k] = np.average(xs, weights=weights)
 
-        slope, _ = np.polyfit(xs[1:], ys[1:], deg=1)
+        slope, _ = np.polyfit(xs[k_lo:k_hi], ys[k_lo:k_hi], deg=1)
         ax.scatter(
             xs[1:], ys[1:],
             color=color,
@@ -92,8 +97,12 @@ def plot_lmis(model_dirs, output_path):
             label=f'{name} (slope = {slope:.2f})'
         )
 
-    ax.plot(xs, xs, color='k', ls='dashed', zorder=1)
-    ax.grid(color=(0.839, 0.839, 0.839), zorder=0)
+    gray = (0.839, 0.839, 0.839)
+    ax.plot(xs[k_lo:k_hi], xs[k_lo:k_hi] + 1, color=gray, zorder=1)
+
+    kwargs = {'lw' : 0, 'fc' : 'none', 'ec' : gray, 'hatch' : 'xx'}
+    ax.fill_between([0, k_lo - 0.5], 0, 39, **kwargs)
+    ax.fill_between([k_hi - 0.5, 39], 0, 39, **kwargs)
 
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
@@ -150,6 +159,9 @@ def plot_shapley_scores(model_dir, output_path, levels=[200, 25, 1]):
             color = _colormap[name]
             ax.barh([0], [0], color=color, label=name)
 
+            if 'ad99' in model_dir:
+                widths[:(k - 1)] = 0
+
             ax.barh(
                 -y, widths,
                 height=1,
@@ -177,7 +189,7 @@ def plot_shapley_scores(model_dir, output_path, levels=[200, 25, 1]):
     plt.tight_layout()
     plt.savefig(output_path, transparent=False)
             
-_colormap = {v : c for v, c in zip(['wind', 'T', 'Nsq', 'shear'], colors)}
+_colormap = dict(zip(['wind', 'T', 'Nsq', 'shear'], colors))
 
 def _setup_level_axis(ax, pressures, y, set_ylabel):
     ax.set_ylim(-y[-1] - 0.5, -y[0] + 0.5)
