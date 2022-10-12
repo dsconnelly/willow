@@ -9,7 +9,7 @@ from ..utils.ad99 import AlexanderDunkerton
 from ..utils.datasets import load_datasets, prepare_datasets
 from ..utils.diagnostics import logs, times
 from ..utils.plotting import colors, format_name, format_pressure
-from ..utils.importance import get_level_data, get_shapley_scores
+from ..utils.shapley import get_level_data, get_shapley_scores
 
 @logs
 @times
@@ -61,8 +61,7 @@ def plot_lmis(model_dirs, output_path):
     data = {}
     for model_dir in model_dirs:
         name = format_name(os.path.basename(model_dir))
-        with xr.open_dataset(os.path.join(model_dir, 'shapley.nc')) as ds:
-            data[name] = abs(ds['scores']).mean('sample')
+        data[name] = _load_scores(model_dir)
 
     fig, ax = plt.subplots()
     fig.set_size_inches(6, 6)
@@ -122,11 +121,63 @@ def plot_lmis(model_dirs, output_path):
     ax.legend(loc='lower right')
 
     plt.tight_layout()
-    plt.savefig(output_path, transparent=False)
+    plt.savefig(output_path)
+
+def plot_shapley_profiles(model_dirs, output_path, kind='latitude'):
+    """
+    Plot Shapley values for a few features throughout the atmosphere.
+
+    Parameters
+    ----------
+    model_dirs : list of str
+        Directories containing shapley.nc files, as created by 
+        save_shapley_scores, for the models in question.
+    output_path : str
+        Where to save the image.
+    kind : str
+        What sort of profiles to plot. Currently only 'latitude' is supported.
+
+    """
+
+    data = {}
+    for model_dir in model_dirs:        
+        scores = _load_scores(model_dir)
+        profile = scores.sel(feature='latitude').values
+        total = scores.values.sum(axis=0)
+
+        name = format_name(os.path.basename(model_dir))
+        data[name] = 100 * np.ma.divide(profile, total).filled(0)
+
+    fig, ax = plt.subplots()
+    fig.set_size_inches(4, 8)
+
+    use_colors = colors
+    if 'ad99' in model_dirs[0]:
+        use_colors = ['k'] + use_colors
+
+    pressures = [format_pressure(p) for p in scores['pressure'].values]
+    ys = np.arange(len(pressures))
+
+    for (name, profile), color in zip(data.items(), use_colors):
+        ax.plot(profile, -ys, color=color, label=name)
+
+    ax.set_xlim(0, 100)
+    ax.set_ylim(-ys[-1], -ys[0])
+
+    ax.set_xticks(np.linspace(0, 100, 6))
+    ax.set_yticks(-ys[::3])
+    ax.set_yticklabels(pressures[::3])
+
+    ax.set_xlabel('importance (%)')
+    ax.set_ylabel('prediction level (hPa)')
+    ax.legend(loc='upper right')
+
+    plt.tight_layout()
+    plt.savefig(output_path)
 
 def plot_shapley_scores(model_dir, output_path, levels=[200, 25, 1]):
     """
-    Plot Shapley values for predictions at several levels.
+    Plot Shapley values for predictions at several individual levels.
 
     Parameters
     ----------
@@ -140,9 +191,10 @@ def plot_shapley_scores(model_dir, output_path, levels=[200, 25, 1]):
 
     """
 
-    with xr.open_dataset(os.path.join(model_dir, 'shapley.nc')) as ds:
-        scores = abs(ds['scores']).mean('sample')
-        pressures = [format_pressure(p) for p in scores['pressure'].values]
+    cmap = dict(zip(['wind', 'T', 'Nsq', 'shear'], colors))
+
+    scores = _load_scores(model_dir)
+    pressures = [format_pressure(p) for p in scores['pressure'].values]
 
     fig, axes = plt.subplots(ncols=len(levels))
     fig.set_size_inches(3 * len(levels), 6)
@@ -156,7 +208,7 @@ def plot_shapley_scores(model_dir, output_path, levels=[200, 25, 1]):
 
         left = np.zeros(y.shape)
         for name, widths in data.items():
-            color = _colormap[name]
+            color = cmap[name]
             ax.barh([0], [0], color=color, label=name)
 
             if 'ad99' in model_dir:
@@ -187,9 +239,11 @@ def plot_shapley_scores(model_dir, output_path, levels=[200, 25, 1]):
         ax.set_xticks(xticks)
 
     plt.tight_layout()
-    plt.savefig(output_path, transparent=False)
-            
-_colormap = dict(zip(['wind', 'T', 'Nsq', 'shear'], colors))
+    plt.savefig(output_path)
+
+def _load_scores(model_dir):
+    with xr.open_dataset(os.path.join(model_dir, 'shapley.nc')) as ds:
+        return abs(ds['scores']).mean('sample')
 
 def _setup_level_axis(ax, pressures, y, set_ylabel):
     ax.set_ylim(-y[-1] - 0.5, -y[0] + 0.5)

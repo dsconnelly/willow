@@ -21,7 +21,7 @@ if __name__ == '__main__':
     plt.rcParams['mathtext.it'] = 'TeX Gyre Adventor'
 
     plt.rcParams['savefig.dpi'] = 400
-    plt.rcParams['savefig.transparent'] = True
+    plt.rcParams['savefig.transparent'] = False
 
     FunctionParser([
         make_datasets, 
@@ -31,6 +31,7 @@ if __name__ == '__main__':
         plot_offline_scores,
         save_shapley_scores,
         plot_shapley_scores,
+        plot_shapley_profiles,
         plot_lmis,
         plot_online_profiling,
         plot_climatologies,

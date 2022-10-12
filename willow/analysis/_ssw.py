@@ -10,7 +10,7 @@ from ..utils.mima import get_fnames
 
 def plot_ssws(case_dirs, output_path):
     """
-    Make a bar graph of the sudden stratospheric warming occurrences in MiMA.
+    Plot the stratospheric polar vortex and count sudden stratospheric warmings.
 
     Parameters
     ----------
