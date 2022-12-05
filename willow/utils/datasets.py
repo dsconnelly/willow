@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import torch
     
-def load_datasets(data_dir, suffix, n_samples=None):
+def load_datasets(data_dir, suffix, n_samples=None, component='both'):
     """
     Load pandas DataFrames from disk, with optional subsampling.
 
@@ -17,6 +17,10 @@ def load_datasets(data_dir, suffix, n_samples=None):
     n_samples : int
         How many rows of each DataFrame should be randomly sampled to return. If
         None, each DataFrame will be returned in full.
+    component : str
+        If 'both', the DataFrame is sampled without regard to whether zonal or
+        meridional drag is being predicted. If 'u' or 'v', only samples from
+        the respective direction are taken.
 
     Returns
     -------
@@ -30,6 +34,18 @@ def load_datasets(data_dir, suffix, n_samples=None):
 
     X = pd.read_pickle(os.path.join(data_dir, f'X-{suffix}.pkl'))
     Y = pd.read_pickle(os.path.join(data_dir, f'Y-{suffix}.pkl'))
+
+    if component != 'both':
+        m = len(X) // 2
+
+        if component == 'u':
+            X, Y = X.iloc[:m], Y.iloc[:m]
+
+        elif component == 'v':
+            X, Y = X.iloc[m:], Y.iloc[m:]
+
+        else:
+            raise ValueError(f'Unknown component {component}')
 
     if n_samples is not None:
         idx = np.random.choice(len(X), size=n_samples, replace=False)
@@ -48,7 +64,7 @@ def prepare_datasets(X, Y, model_name, as_array=True, return_col_idx=False):
     model_name : str
         The name of the model being trained. It should be a hyphen-separated
         list of (potentially among other things) input variable names, which can
-        be 'wind', 'shear', 'T', and 'Nsq'. Location variables (surface pressure
+        be 'wind', 'shear', 'T', and 'N'. Location variables (surface pressure
         and latitude) will be included, unless 'noloc' is in the list.
     as_array : bool
         Whether the outputs should be cast from a pd.DataFrame to an array class
@@ -82,7 +98,7 @@ def prepare_datasets(X, Y, model_name, as_array=True, return_col_idx=False):
     return X, Y
 
 def _filter_columns(name_parts, columns):
-    allowed = {'wind', 'shear', 'T', 'Nsq'} & name_parts
+    allowed = {'wind', 'shear', 'T', 'N'} & name_parts
     if 'noloc' not in name_parts:
         allowed = allowed | {'pressure', 'latitude'}
 

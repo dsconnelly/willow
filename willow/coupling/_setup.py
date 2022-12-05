@@ -85,7 +85,10 @@ def _submit_modifier(line, control_dir, case_dir, model_name):
         return line.replace(control_dir, case_dir)
 
     if '--mem' in line:
-        return line.replace('8G', '64G' if 'random' in model_name else '16G')
+        if 'mubofo' in model_name or 'random' in model_name:
+            return line.replace('8G', '64G')
+
+        return line.replace('8G', '16G')
     
     if '--job-name' in line:
         return f'#SBATCH --job-name={model_name}-online\n'
@@ -103,8 +106,8 @@ def _submit_modifier(line, control_dir, case_dir, model_name):
     if './mima.x' in line:
         return 'export PYTHONWARNINGS=ignore::UserWarning\n' + line
 
-    if '{01..40}' in line:
-        return line.replace('{01..40}', '{01..15}')
+    # if '{01..40}' in line:
+    #     return line.replace('{01..40}', '{01..15}')
 
     if 'mv RESTART/* INPUT' in line:
         lines = [
@@ -130,7 +133,7 @@ def _submit_modifier(line, control_dir, case_dir, model_name):
             line.strip(), '',
             'cdo mergetime ??/qbo.nc qbo.nc',
             'cdo mergetime ??/ssw.nc ssw.nc',
-            'for yy in {01..15}; do',
+            'for yy in {01..40}; do',
             '    rm -rf ${yy}',
             'done'
         ]

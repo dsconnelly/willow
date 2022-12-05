@@ -87,12 +87,12 @@ def _apply_butterworth(u):
         vectorize=True
     ).transpose('time', 'pfull')
 
-def _qbo_amplitude(u, level=20):
+def _qbo_amplitude(u, level=10):
     return _std_with_error(u.sel(pfull=level, method='nearest').values)
 
-def _qbo_period(u, level=10, method='crossings'):
+def _qbo_period(u, level=10, method='fourier'):
     u = u.sel(pfull=level, method='nearest')
-    
+
     if method == 'crossings':
         crossings = (u.values[:-1] < 0) & (u.values[1:] > 0)
         days = u['time'].values[:-1][crossings]

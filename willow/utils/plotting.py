@@ -6,7 +6,8 @@ colors = [
     'forestgreen',
     (0.341, 0.024, 0.549),
     'darkorange',
-    'hotpink'
+    'hotpink',
+    'springgreen'
 ]
 
 def format_latitude(lat):
@@ -35,7 +36,7 @@ def format_latitude(lat):
         
     return f'$\mathregular{{ {int(abs(lat))}^o {suffix} }}$'
 
-def format_name(name, simple=True):
+def format_name(name, simple=False):
     """
     Parse the name of a MiMA run for displaying in plots.
 
@@ -53,24 +54,32 @@ def format_name(name, simple=True):
 
     """
 
-    if not simple:
-        name_parts = name.split('-')
-        perturbations = ['control', '4xco2', 'o3hole']
-        is_valid = lambda s: len(s) > 1 and s not in perturbations
-
-        return '-'.join(filter(is_valid, name_parts))
-
     if 'ad99' in name:
         return 'AD99'
 
-    if 'mubofo' in name:
-        return 'boosted forest'
+    kind, *name_parts = name.split('-')
+    kind = {
+        'mubofo' : 'boosted forest',
+        'xgboost' : 'XGBoost',
+        'random' : 'random forest',
+        'WaveNet' : 'neural network'
+    }[kind]
 
-    if 'random' in name:
-        return 'random forest'
+    if simple:
+        return kind
 
-    if 'WaveNet' in name:
-        return 'neural network'
+    if 'noloc' not in name_parts:
+        name_parts.extend(['$\\vartheta$', '$p_\mathrm{s}$'])
+
+    to_drop = ['noloc', 'control', '4xco2', 'o3hole', 'full']
+    is_valid = lambda s: s not in to_drop and (len(s) > 1 or s in 'NT')
+
+    name_parts = list(filter(is_valid, name_parts[1:]))
+    for i, part in enumerate(name_parts):
+        if len(part) == 1:
+            name_parts[i] = f'${part}$'
+
+    return kind + ' (' + ', '.join(name_parts) + ')'
 
 def format_pressure(p):
     """

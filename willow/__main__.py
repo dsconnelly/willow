@@ -14,12 +14,6 @@ if __name__ == '__main__':
     for font in fm.findSystemFonts('data/fonts'):
         fm.fontManager.addfont(font)
 
-    plt.rcParams['font.family'] = 'TeX Gyre Adventor'
-    plt.rcParams['font.size'] = 12
-
-    plt.rcParams['mathtext.fontset'] = 'custom'
-    plt.rcParams['mathtext.it'] = 'TeX Gyre Adventor'
-
     plt.rcParams['savefig.dpi'] = 400
     plt.rcParams['savefig.transparent'] = False
 
@@ -29,10 +23,12 @@ if __name__ == '__main__':
         setup_mima,
         plot_example_profiles,
         plot_offline_scores,
+        plot_tropical_drag,
         save_shapley_scores,
         plot_shapley_scores,
         plot_shapley_profiles,
         plot_lmis,
+        plot_oracle,
         plot_online_profiling,
         plot_climatologies,
         plot_distributions,

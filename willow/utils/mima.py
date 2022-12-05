@@ -4,16 +4,14 @@ R_dry = 287.04
 c_p = 7 * R_dry / 2
 grav = 9.8
 
-def get_fnames(case_dir, n_years=12):
+def get_fnames(case_dir):
     """
-    Get the filenames corresponding to the last chunk of a MiMA run.
+    Get the filenames corresponding to outputs of a MiMA run.
 
     Parameters
     ----------
     case_dir : str
         The directory containing the MiMA run.
-    n_years : int
-        The number of years to retain, counting from the end of the run.
 
     Returns
     -------
@@ -25,7 +23,7 @@ def get_fnames(case_dir, n_years=12):
     years = sorted([s for s in os.listdir(case_dir) if s.isdigit()])
     fnames = [os.path.join(case_dir, y, 'atmos_4xdaily.nc') for y in years]
 
-    return fnames[-n_years:]
+    return fnames
 
 def get_mima_name(field):
     """

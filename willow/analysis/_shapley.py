@@ -9,7 +9,7 @@ from ..utils.ad99 import AlexanderDunkerton
 from ..utils.datasets import load_datasets, prepare_datasets
 from ..utils.diagnostics import logs, times
 from ..utils.plotting import colors, format_name, format_pressure
-from ..utils.shapley import get_level_data, get_shapley_scores
+from ..utils.shapley import get_level_data, get_lmis, get_shapley_scores
 
 @logs
 @times
@@ -29,7 +29,7 @@ def save_shapley_scores(model_dir, data_dir):
     """
 
     model_name = os.path.basename(model_dir)
-    X, Y = load_datasets(data_dir, 'tr', 5000)
+    X, Y = load_datasets(data_dir, 'tr', 10000)
     samples, Y = prepare_datasets(X, Y, model_name, as_array=False)
 
     if model_name.startswith('ad99'):
@@ -72,22 +72,9 @@ def plot_lmis(model_dirs, output_path):
 
     k_lo, k_hi = 11, 37
     for (name, scores), color in zip(data.items(), use_colors):
-        levels = scores.pressure.values[::-1]
-        xs = np.arange(len(levels))
-        ys = np.zeros(xs.shape)
-
-        for k, level in enumerate(levels[1:], start=1):
-            _, profiles = get_level_data(scores, level)
-            weights = sum(profile for _, profile in profiles.items())
-
-            weights = weights[::-1]
-            if 'AD99' in name:
-                weights[(k + 2):] = 0
-
-            weights = (weights / weights.sum())
-            ys[k] = np.average(xs, weights=weights)
-
+        xs, ys = get_lmis(name, scores)
         slope, _ = np.polyfit(xs[k_lo:k_hi], ys[k_lo:k_hi], deg=1)
+
         ax.scatter(
             xs[1:], ys[1:],
             color=color,
@@ -109,7 +96,9 @@ def plot_lmis(model_dirs, output_path):
     ax.set_xticks(xs[::3])
     ax.set_yticks(xs[::3])
 
+    levels = scores.pressure.values[::-1]
     levels = [format_pressure(p) for p in levels]
+    
     ax.set_xticklabels(levels[::3], rotation=45)
     ax.set_yticklabels(levels[::3])
 

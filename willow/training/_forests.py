@@ -7,7 +7,8 @@ import xgboost as xgb
 from mubofo import BoostedForestRegressor
 from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import train_test_split
+from sklearn.metrics import r2_score
+from sklearn.model_selection import GridSearchCV, train_test_split
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -15,21 +16,21 @@ from ..utils.datasets import load_datasets, prepare_datasets
 from ..utils.statistics import standardize
 from ..utils.wrappers import MiMAModel
 
-_N_TREES = 300
+_N_TREES = 5000
 _MAX_DEPTH = 15
-_LEARNING_RATE = 0.08
-_MAX_SAMPLES = 0.3
-_MAX_FEATURES = 0.5
-_PATIENCE = 20
+_LEARNING_RATE = 0.01
+_MAX_SAMPLES = 0.05
+_MAX_FEATURES = 0.9
+_PATIENCE = 25
 
 def train_scikit_forest(data_dir, model_dir):    
     model_name = os.path.basename(model_dir)
     kind = model_name.split('-')[0]
     
-    X, Y = load_datasets(data_dir, 'tr')
+    X, Y = load_datasets(data_dir, 'tr', n_samples=int(1e5))
     X, Y, col_idx = prepare_datasets(X, Y, model_name, return_col_idx=True)
     Y_scaled, means, stds = standardize(Y, return_stats=True)
-    
+
     kwargs = {
         'n_estimators' : _N_TREES,
         'max_depth' : _MAX_DEPTH,
@@ -42,30 +43,20 @@ def train_scikit_forest(data_dir, model_dir):
         
     elif kind == 'mubofo':
         model_class = BoostedForestRegressor
-        
+
         kwargs['learning_rate'] = _LEARNING_RATE
         kwargs['val_size'] = 0.2
-        kwargs['patience'] = _PATIENCE
-        kwargs['threshold'] = 0.01
+        kwargs['max_patience'] = _PATIENCE
+        kwargs['threshold'] = 0
         kwargs['verbose'] = True
-        
+
     else:
         raise ValueError(f'Unknown forest type: {kind}')
         
     logging.info(f'Loaded {X.shape[0]} samples.')
     logging.info(f'Training a {model_class.__name__}.')
-    
-    if 'pca' in model_name:
-        logging.info('Using PCA in training pipeline.')
-        
-        estimator_class = model_class
-        def model_class(**kwargs):
-            return make_pipeline(
-                StandardScaler(),
-                PCA(n_components=0.9),
-                estimator_class(**kwargs)
-            )
-        
+    _override_parameters(model_name, kwargs)
+
     model = model_class(**kwargs).fit(X, Y_scaled)
     model = MiMAModel(model_name, model, means, stds, col_idx)
     joblib.dump(model, os.path.join(model_dir, 'model.pkl'))
@@ -103,3 +94,12 @@ def train_xgboost_forest(data_dir, model_dir):
     
     model = MiMAModel(model_name, model, means, stds, col_idx)
     joblib.dump(model, os.path.join(model_dir, 'model.pkl'))
+
+def _override_parameters(model_name, kwargs):
+    for override in [s for s in model_name.split('-') if '_' in s]:
+        *name, value = override.split('_')
+        name = '_'.join(name)
+
+        caster = type(kwargs[name])
+        kwargs[name] = caster(value)
+        logging.info(f'Setting {name} to {value} by user request.')

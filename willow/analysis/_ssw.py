@@ -29,13 +29,13 @@ def plot_ssws(case_dirs, output_path):
         name = os.path.basename(case_dir)
         path = os.path.join(case_dir, 'ssw.nc')
 
-        n_years = 12
+        n_years = 32
         if os.path.exists(path):
             with xr.open_dataset(path, decode_times=False) as ds:
                 u = ds['u_gwf'].isel(time=slice(-(360 * n_years), None))
 
         else:
-            fnames = get_fnames(case_dir, n_years=n_years)
+            fnames = get_fnames(case_dir)[-n_years:]
             with xr.open_mfdataset(fnames, decode_times=False) as ds:
                 u = ds['u_gwf'].sel(lat=60, method='nearest').mean('lon')
                 

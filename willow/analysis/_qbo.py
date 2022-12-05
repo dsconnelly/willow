@@ -26,7 +26,7 @@ def plot_qbos(case_dirs, output_path):
 
     """
 
-    plots_per_col = 4
+    plots_per_col = 3
 
     n_qbos = len(case_dirs)
     n_rows = min(n_qbos, plots_per_col)
@@ -49,11 +49,13 @@ def plot_qbos(case_dirs, output_path):
             if len(axes) < n_qbos:
                 axes.append(fig.add_subplot(gs[i, j]))
 
-    data = {os.path.basename(s) : load_qbo(s, n_years=12) for s in case_dirs}
-    vmin, vmax, cmap = get_bounds_and_cmap('u', data)
+    data = {os.path.basename(s) : load_qbo(s, n_years=32) for s in case_dirs}
+    # vmin, vmax, cmap = get_bounds_and_cmap('u', data)
+    vmin, vmax, cmap = -75, 75, 'RdBu_r'
+    levels = np.linspace(vmin, vmax, 13)
 
     for (name, u), ax in zip(data.items(), axes):
-        years = u.time / 360
+        years = (u.time - u.time[0]) / 360
         ys = np.arange(len(u.pfull))
         ps = [format_pressure(p) for p in u.pfull.values]
 
@@ -62,11 +64,14 @@ def plot_qbos(case_dirs, output_path):
             vmin=vmin, 
             vmax=vmax,
             cmap=cmap,
-            levels=15
+            levels=levels
         )
 
         ax.set_yticks(-ys[::3])
         ax.set_yticklabels(ps[::3])
+
+        ax.set_xticks(np.linspace(0, years.max(), 9))
+        ax.set_xticklabels(np.linspace(0, 32, 9).astype(int))
 
         ax.set_xlabel('year')
         ax.set_ylabel('p (hPa)')
@@ -77,7 +82,8 @@ def plot_qbos(case_dirs, output_path):
             f'{amp:.1f} $\pm$ {amp_err:.1f} m s$^{{-1}}$ amplitude'
         )
 
-        ax.set_title(format_name(name))
+        #ax.set_title(format_name(name))
+        ax.set_title(name)
         ax.text(
             0.85, 0.17, info,
             ha='center',
@@ -91,9 +97,9 @@ def plot_qbos(case_dirs, output_path):
             )
         )
 
-    units = get_units('u')
     cbar = plt.colorbar(img, cax=cax, orientation='horizontal')
-    cbar.set_label(f'zonal mean tropical $u$ ({units})')
+    cbar.set_label(f'zonal mean tropical $u$ ({get_units("u")})')
+    cbar.set_ticks(levels[::2])
 
     plt.savefig(output_path, bbox_inches='tight')
         

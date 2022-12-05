@@ -60,6 +60,43 @@ def get_level_data(scores, level):
 
     return k, {name : handle(v) for name, v in profiles.items()}
 
+def get_lmis(name, scores):
+    """
+    Compute levels of maximum importance.
+
+    Parameters
+    ----------
+    name : str
+        The name of the model. Only used to correct AD99 numerical zeros.
+    scores : xr.Dataset
+        The precomputed Shapley values. Should have pressure and feature
+        coordinates, and the feature coordinates should have their corresponding
+        pressures preceded by the @ symbol.
+    
+    Returns
+    -------
+    xs, ys : np.ndarray
+        The prediction levels and corresponding LMIs, in index coordinates.
+
+    """
+
+    levels = scores.pressure.values[::-1]
+    xs = np.arange(len(levels))
+    ys = np.zeros(xs.shape)
+
+    for k, level in enumerate(levels[1:], start=1):
+        _, profiles = get_level_data(scores, level)
+        weights = sum(profile for _, profile in profiles.items())
+
+        weights = weights[::-1]
+        if 'AD99' in name and k < 37:
+            weights[(k + 2):] = 0
+
+        weights = (weights / weights.sum())
+        ys[k] = np.average(xs, weights=weights)
+
+    return xs, ys
+
 def get_shapley_scores(samples, model, Y=None):
     """
     Compute Shapley values for various model architectures.
@@ -94,8 +131,9 @@ def get_shapley_scores(samples, model, Y=None):
         stds = Y.std(axis=0)
         f = lambda Z: standardize(model.predict(Z), means, stds)
 
-        background, X = X[:4000], X[-500:]
-        background = kmeans(background, 50)
+        m = round(0.8 * X.shape[0])
+        background, X = X[:m], X[m:]
+        background = kmeans(background, 100)
 
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', category=FutureWarning)
@@ -117,8 +155,9 @@ def get_shapley_scores(samples, model, Y=None):
         scores = np.stack(explainer.shap_values(X))
 
     elif isinstance(model, Module):
-        m = round(0.2 * X.shape[0])
+        m = round(0.8 * X.shape[0])
         background, X = X[:m], X[m:]
+        background = kmeans(background, 100).data
 
         explainer = DeepExplainer(model, torch.tensor(background))
         scores = np.stack(explainer.shap_values(torch.tensor(X)))

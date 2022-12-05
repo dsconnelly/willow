@@ -13,6 +13,7 @@ from cartopy.util import add_cyclic_point
 from ..utils.mima import get_fnames, get_mima_name
 from ..utils.plotting import (
     format_latitude,
+    format_name,
     format_pressure,
     get_bounds_and_cmap,
     get_units
@@ -45,7 +46,7 @@ def plot_climatologies(fields, case_dirs, kind, output_dir):
     datas = defaultdict(dict)
     for case_dir in case_dirs:
         name = os.path.basename(case_dir)
-        fnames = get_fnames(case_dir, n_years=12)
+        fnames = get_fnames(case_dir)[-15:]
 
         with xr.open_mfdataset(fnames, decode_times=False) as ds:
             ds = ds.sel(**sels).mean(means)
@@ -75,7 +76,7 @@ def plot_climatologies(fields, case_dirs, kind, output_dir):
         vmin, vmax, cmap = get_bounds_and_cmap(field, data)
         for ax, (name, a) in zip(axes, data.items()):
             img = plot_func(ax, a, vmin, vmax, cmap)
-            ax.set_title(name)
+            ax.set_title(format_name(name))
 
         units = get_units(field)
         cbar = plt.colorbar(img, cax=cax, orientation='horizontal')
