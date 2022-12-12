@@ -1,7 +1,7 @@
 #!/bin/bash -e
 
 #SBATCH --tasks=1
-#SBATCH --time=48:00:00
+#SBATCH --time=72:00:00
 #SBATCH --mem=64GB
 #SBATCH --out=/scratch/dsc7746/willow/slurm.out
 #SBATCH --mail-user=dsconnelly@nyu.edu

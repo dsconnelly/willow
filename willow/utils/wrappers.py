@@ -1,109 +1,100 @@
 import numpy as np
-import torch, torch.nn as nn
-import xgboost as xgb
+import pandas as pd
+import torch
 
-class StandardizedModel:
-    """Wrapper for models to handle I/O sanitization and unstandardization."""
+from .aliases import Dataset, Model
 
-    def __init__(self, name, model, means, stds):
+class MiMAModel:
+    """Model wrapper that handles standardization and column indexing."""
+
+    def __init__(
+        self,
+        name: str,
+        model: Model,
+        means: np.ndarray,
+        stds: np.ndarray,
+        col_idx: np.ndarray
+    ) -> None:
         """
-        Initialize a StandardizedModel.
+        Initialize a MiMAModel.
 
         Parameters
         ----------
-        name : str
-            The name of the model.
-        model : sklearn.base.BaseEstimator or xgboost.Booster or nn.Module
-            The trained model. Can be an object implementing the scikit-learn
-            estimator API, an xgboost Booster, or a torch model.
-        means, stds : np.ndarray or torch.Tensor
-            The means and standard deviations to be used in unstandardization of
-            the model output. If model is an nn.Module, means and stds should be
-            torch.Tensors; otherwise, they should be np.ndarrays.
+        name : Name of the model.
+        model : Trained regressor. Can be an object implementing the
+            scikit-learn estimator API (namely, one with a predict method) or a
+            torch model.
+        means, stds : Means and standard deviations used to standardize the
+            output columns during training, to be used to dimensionalize the
+            model output.
+        col_idx : Array of integers indexing the columns of the full feature
+            array corresponding to those features used by `model`.
 
         """
 
         self.name = name
-        self.model = model      
-
-        self.is_torch = isinstance(self.model, nn.Module)
-        self.is_xgboost = isinstance(self.model, xgb.Booster) 
-        
-        if self.is_torch:
-            means = means.numpy()
-            stds = stds.numpy()
-    
-        self.means = means
-        self.stds = stds
-
-    def predict(self, X):
-        """
-        Use self.model to make a prediction.
-
-        Parameters
-        ----------
-        X : np.ndarray of shape (n_samples, n_features)
-            The input data.
-
-        Returns
-        -------
-        output : np.ndarray of shape (n_samples, n_outputs)
-            The output of self.model, unstandardized to be in physical space.
-
-        """
-
-        return self.means + self.stds * self._apply(X)
-
-    def _apply(self, X):
-        if self.is_torch:
-            if not isinstance(X, torch.Tensor):
-                X = torch.tensor(X)
-                
-            with torch.no_grad():
-                return self.model(X).double().numpy()
-
-        if self.is_xgboost:
-            X = xgb.DMatrix(X)
-
-        return self.model.predict(X).astype(np.float64)
-
-class MiMAModel(StandardizedModel):
-    """StandardizedModel subclass to handle online predictions."""
-
-    def __init__(self, name, model, means, stds, col_idx):
-        """
-        Initialize a MiMA model.
-
-        Parameters
-        ----------
-        name, model, means, stds
-            Same as for StandardizedModel.
-        col_idx : np.ndarray of shape (161,)
-            The indices of the columns in the full data array passed by MiMA
-            corresponding to input variables to the trained model. Most likely
-            obtained as an output from willow.utils.datasets.prepare_datasets.
-
-        """
-
-        super().__init__(name, model, means, stds)
+        self.model = model
         self.col_idx = col_idx
 
-    def predict_online(self, X):
+        self.means = means
+        self.stds = stds
+        
+    def apply(self, X: np.ndarray) -> np.ndarray:
         """
-        Apply self.model to a full data array passed by MiMA.
+        Apply the model and return the still-dimensionless output.
 
         Parameters
         ----------
-        X : np.ndarray of shape (n_samples, 161)
-            The full data array passed by MiMA, containing all possible model
-            input variables.
+        X : Array of input features. Should already have been indexed to contain
+            only those columns that the model was trained on.
         
         Returns
         -------
-        output : np.ndarray of shape (n_samples, n_outputs)
-            The result of first taking only the columns in self.col_idx of X
-            and then passing the data into self.predict.
+        output : Model predictions. Assuming the training outputs were
+            standardized, this array is still dimensionless and needs to be
+            unstandardized to be physically meaningful.
 
         """
-        
-        return np.asfortranarray(self.predict(X[:, self.col_idx]))
+
+        if isinstance(self.model, torch.nn.Module):
+            with torch.no_grad():
+                return self.model(torch.tensor(X)).double().numpy()
+
+        return self.model.predict(X).astype(np.double)
+
+    def predict(self, X: Dataset) -> np.ndarray:
+        """
+        Apply the model to the selected features and unstandardize the result.
+
+        Parameters
+        ----------
+        X : Input features for each sample. Should contain all possible input
+            features; the appropriate columns are selected in this function. If
+            a `DataFrame`, will be cast to an `ndarray` before prediction.
+
+        Returns
+        -------
+        output : Model predictions, unstandardized so as to have physical units.
+
+        """
+
+        if isinstance(X, pd.DataFrame):
+            X = X.to_numpy()
+
+        return self.means + self.stds * self.apply(X[:, self.col_idx])
+
+    def predict_online(self, X: np.ndarray) -> np.ndarray:
+        """
+        Apply the model and return a result that MiMA can use.
+
+        Parameters
+        ----------
+        X : Full input feature array passed by MiMA with all possible features.
+
+        Returns
+        -------
+        output : Unstandardized model predictions stored in Fortran order.
+
+        """
+
+        return np.asfortranarray(self.predict(X))

@@ -4,22 +4,22 @@ import os
 import sys
 import time
 
-def logs(func):
+from typing import Callable
+
+def log(func: Callable) -> Callable:
     """
-    Decorate functions with certain arguments to enable automatic logging.
+    Decorate certain functions to enable automatic logging.
 
     Parameters
     ----------
-    func : callable
-        The function to set up logging for. Should take 'model_dir' as a
-        positional argument.
+    func : Function to set up logging for. Should take 'model_dir' as a
+        positional argument. The log will be written to a file
+        `f'{func.__name__.replace("_", "-")}.log'` in model_dir.
 
     Returns
     -------
-    func_with_logging : callable
-        A function that, before calling func, reads the 'model_dir' positional
-        argument and creates a log file in that directory, to which standard
-        output and Python tracebacks will be written.
+    func_with_logging : Function with the same signature as func that configures
+        logging as described above before calling func.
 
     """
 
@@ -28,56 +28,55 @@ def logs(func):
         model_dir = kwargs['model_dir']
         if not os.path.exists(model_dir):
             os.makedirs(model_dir)
-            
+
         fname = func.__name__.replace('_', '-') + '-log.out'
+        path = os.path.join(model_dir, fname)
+
         logging.basicConfig(
-            filename=os.path.join(model_dir, fname),
+            filename=path,
             filemode='w',
             format='%(message)s',
             level=logging.INFO
         )
-        
+
         def handle(exc_type, exc_value, traceback):
             if issubclass(exc_type, KeyboardInterrupt):
                 sys.__excepthook__(exc_type, exc_value, traceback)
                 return
-            
-            logging.error(
-                f'{func.__name__} had an uncaught exception:',
-                exc_info=(exc_type, exc_value, traceback)
-            )
-            
+
+            message = f'{func.__name__} had an uncaught exception:'
+            info = (exc_type, exc_value, traceback)
+            logging.error(message, exc_info=info)
+
         sys.excepthook = handle
-        
+
         return func(*args, **kwargs)
-    
+
     return func_with_logging
 
-def times(func):
+def profile(func: Callable) -> Callable:
     """
-    Decorate functions to log their runtimes.
+    Decorate a function to log its runtime.
 
     Parameters
     ----------
-    func : callable
-        The function to be timed.
-
+    func : Function to be timed.
+    
     Returns
     -------
-    timed_func : callable
-        A function that checks the time before and after func is called and logs
-        a message with the runtime before returning the output of func.
-        
+    func_with_profiling : Function with the same signature as func that prints
+        the runtime before returning the return value of func.
+
     """
 
     @functools.wraps(func)
-    def timed_func(*args, **kwargs):
+    def func_with_profiling(*args, **kwargs):
         start = time.time()
         output = func(*args, **kwargs)
         runtime = time.time() - start
-        
+
         logging.info(f'{func.__name__} took {runtime:.2f} seconds.')
-        
+
         return output
-    
-    return timed_func
+
+    return func_with_profiling

@@ -1,3 +1,3 @@
-from ._mima import make_datasets
+from .mima import save_datasets
 
-__all__ = ['make_datasets']
+__all__ = ['save_datasets']

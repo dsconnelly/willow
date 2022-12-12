@@ -1,39 +1,44 @@
 import os
 
+from typing import Iterable, Literal, Optional, overload
+
 import numpy as np
 import pandas as pd
 import torch
-    
-def load_datasets(data_dir, suffix, n_samples=None, component='both'):
+
+from .aliases import Dataset
+
+def load_datasets(
+    data_dir: str,
+    suffix: str,
+    n_samples: Optional[int]=None,
+    component: str='both'
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Load pandas DataFrames from disk, with optional subsampling.
+    Load features and targets as `DataFrame`s, with optional subsampling.
 
     Parameters
     ----------
-    data_dir : str
-        The directory containing the pickled DataFrames.
-    suffix : str
-        The suffix to be added on to the file names. Should be 'tr' or 'te'.
-    n_samples : int
-        How many rows of each DataFrame should be randomly sampled to return. If
-        None, each DataFrame will be returned in full.
-    component : str
-        If 'both', the DataFrame is sampled without regard to whether zonal or
-        meridional drag is being predicted. If 'u' or 'v', only samples from
-        the respective direction are taken.
+    data_dir : Directory containing the pickled `DataFrame`s.
+    suffix : Suffix to add on to the file names. Should be either `'tr'` or
+        `'te'`, depending on whether training or test data should be loaded.
+    n_samples : How many rows of each `DataFrame` should be randomly sampled to
+        return. If `None`, each `DataFrame` will be returned in full.
+    component : If `'both'`, the `DataFrame` is sampled without regard to
+        whether zonal or meridional drag is being predicted. If `'u'` or `'v'`,
+        only samples from the respective direction are taken.
 
     Returns
     -------
-    X, Y : pd.DataFrame
-        DataFrames with input and output variables. X contains all possible
-        input variables (wind, shear, temperature, buoyancy frequency, surface
-        pressure, and latitude). Y contains the corresponding gravity wave drag
-        profiles for each sample.
+    X, Y : `DataFrame`s with input and output variables. `X` contains all
+        possible input features (wind, shear, temperature, buoyancy frequency,
+        surface pressure, and latitude). `Y` contains the corresponding gravity
+        wave drag profiles for each sample.
 
     """
 
-    X = pd.read_pickle(os.path.join(data_dir, f'X-{suffix}.pkl'))
-    Y = pd.read_pickle(os.path.join(data_dir, f'Y-{suffix}.pkl'))
+    X: pd.DataFrame = pd.read_pickle(os.path.join(data_dir, f'X-{suffix}.pkl'))
+    Y: pd.DataFrame = pd.read_pickle(os.path.join(data_dir, f'Y-{suffix}.pkl'))
 
     if component != 'both':
         m = len(X) // 2
@@ -48,64 +53,71 @@ def load_datasets(data_dir, suffix, n_samples=None, component='both'):
             raise ValueError(f'Unknown component {component}')
 
     if n_samples is not None:
+        n_samples = min(n_samples, len(X))
         idx = np.random.choice(len(X), size=n_samples, replace=False)
         X, Y = X.iloc[idx], Y.iloc[idx]
-    
+
     return X, Y
-    
-def prepare_datasets(X, Y, model_name, as_array=True, return_col_idx=False):
+
+def prepare_datasets(
+    X: pd.DataFrame,
+    Y: pd.DataFrame,
+    model_name: str,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
-    Extract the relevant input variables for a given model.
+    Extract relevant input features for a given model.
 
     Parameters
     ----------
-    X, Y : pd.DataFrame
-        DataFrames of input and output data, as returned by load_datasets.
-    model_name : str
-        The name of the model being trained. It should be a hyphen-separated
-        list of (potentially among other things) input variable names, which can
-        be 'wind', 'shear', 'T', and 'N'. Location variables (surface pressure
-        and latitude) will be included, unless 'noloc' is in the list.
-    as_array : bool
-        Whether the outputs should be cast from a pd.DataFrame to an array class
-        (either a np.array or a torch.Tensor, depending on model_name).
-    return_col_idx : bool
-        Whether to return the indices corresponding to the returned columns of
-        X. These indices are useful for coupling models to MiMA, where the model
-        needs to extract input variables from an unlabeled array.
+    X, Y : `DataFrame`s as returned by `load_datasets`.
+    model_name : Name of the model being trained. It should be a list of input
+        feature names (potentially among other things), separated by hyphens,
+        which can be `'wind'`, `'shear'`, `'T'`, and `'N'`. Location variables
+        (surface pressure and latitude) will be included unless `'noloc'` is in
+        the list.
+    return_col_idx : Whether to return the indices corresponding to the
+        returned columns of `X`. These indices are useful for coupling models to 
+        MiMA, where the model needs to extract features from an unlabled array.
 
     Returns
     -------
-    X, Y : np.ndarry or torch.Tensor
-        The extracted input and output data. If The first hyphen-separated part
-        of model_name does not specify AD99 or a kind of forest, the model is
-        assumed to be a torch model, and the outputs are cast as torch.Tensors.
+    X, Y : Extracted input and output data as `ndarray`s.
 
     """
 
-    name_parts = model_name.split('-')
-    keep, idx = _filter_columns(set(name_parts), X.columns)
-    X = X[keep]
+    name_parts = set(model_name.split('-'))
+    keep_names, idx = _get_columns_and_index(name_parts, X.columns)
+    X = X[keep_names]
     
-    if as_array:          
-        X, Y = X.to_numpy(), Y.to_numpy()
-        if name_parts[0] not in ['ad99', 'mubofo', 'random', 'xgboost']:
-            X, Y = torch.tensor(X), torch.tensor(Y)
-        
-    if return_col_idx:
-        return X, Y, idx
-        
-    return X, Y
+    return X.to_numpy(), Y.to_numpy(), idx
 
-def _filter_columns(name_parts, columns):
+def _get_columns_and_index(
+    name_parts: set[str],
+    columns: Iterable[str]
+) -> tuple[list[str], np.ndarray]:
+    """
+    Get the column names and indices needed for a given model.
+
+    Parameters
+    ----------
+    name_parts : Set of strings that were hyphen-separated in the model name.
+    columns : List of available feature names.
+
+    Returns
+    -------
+    keep_names : List of column names to keep for the given model.
+    idx : Indices of the columns in `keep_names`.
+
+    """
+
     allowed = {'wind', 'shear', 'T', 'N'} & name_parts
     if 'noloc' not in name_parts:
         allowed = allowed | {'pressure', 'latitude'}
 
-    keep, idx = [], []
+    keep_names, idx = [], []
     for i, column in enumerate(columns):
         if any([name in column for name in allowed]):
-            keep.append(column)
+            keep_names.append(column)
             idx.append(i)
 
-    return keep, np.array(idx)
+    return keep_names, np.array(idx)

@@ -1,35 +1,49 @@
+import logging
 import os
 
-from ._forests import train_scikit_forest, train_xgboost_forest
-from ._networks import train_network
-from ..utils.diagnostics import logs, times
+import joblib
+import numpy as np
+import torch
+
+from .forests import train_forest
+from .networks import train_network
+
+from ..utils.aliases import Model
+from ..utils.datasets import load_datasets, prepare_datasets
+from ..utils.diagnostics import log, profile
+from ..utils.statistics import standardize
+from ..utils.wrappers import MiMAModel
 
 __all__ = ['train_emulator']
 
-@logs
-@times
-def train_emulator(data_dir, model_dir):
+@log
+@profile
+def train_emulator(data_dir: str, model_dir: str) -> None:
     """
     Train a forest or neural network emulator.
 
     Parameters
     ----------
-    data_dir : str
-        Directory where training and test datasets are saved.
-    model_dir : str
-        Directory where trained model will be saved. The hyphen-separated prefix
-        of the directory name will be used to determine the kind of model. If
-        the prefix is one of 'mubofo', 'random', or 'xgboost', then the
-        appropriate kind of forest will be trained; otherwise, a neural network
-        will be trained and the prefix should be the name of a class defined in
-        _architectures.py.
+    data_dir : Directory where training and test datasets are saved.
+    model_dir : Directory where the trained model will be saved. The prefix of
+        separated by a hyphen, is used to determine the kind of model. If the
+        prefix is one of `'mubofo'` or `'random'`, then the appropriate kind of
+        forest will be trained; otherwise, a neural network will be trained and
+        the prefix should be the name of a class defined in `networks.py`.
 
     """
 
-    prefix = os.path.basename(model_dir).split('-')[0]
-    if prefix in ['mubofo', 'random']:
-        train_scikit_forest(data_dir, model_dir)
-    elif prefix == 'xgboost':
-        train_xgboost_forest(data_dir, model_dir)
-    else:
-        train_network(data_dir, model_dir)
+    model_name = os.path.basename(model_dir)
+    kind, *_ = model_name.split('-')
+
+    data = load_datasets(data_dir, 'tr')
+    X, Y, col_idx = prepare_datasets(*data, model_name)
+    Y_scaled, means, stds = standardize(Y)
+
+    logging.info(f'Loaded {X.shape[0]} training samples.')
+    train_func = train_forest if kind in ['mubofo', 'random'] else train_network
+    model = train_func(X, Y_scaled, model_name)
+
+    wrapper = MiMAModel(model_name, model, means, stds, col_idx)
+    joblib.dump(wrapper, os.path.join(model_dir, 'model.pkl'))
+    

@@ -1,53 +1,22 @@
 import os
 
-R_dry = 287.04
-c_p = 7 * R_dry / 2
-grav = 9.8
-
-def get_fnames(case_dir):
+def get_paths(case_dir: str) -> list[str]:
     """
-    Get the filenames corresponding to outputs of a MiMA run.
+    Get the paths to files containing MiMA output.
 
     Parameters
     ----------
-    case_dir : str
-        The directory containing the MiMA run.
+    case_dir : Directory where MiMA was run. Should contain subdirectories with
+        names corresponding to the years of the run, each of which contains
+        exactly one file called `'atmos_4xdaily.nc'`.
 
     Returns
     -------
-    fnames : list of str
-        A sorted list of names of the netCDF files for the requested years.
+    fnames : Sorted list of paths to netCDF files containing MiMA output.
 
     """
 
     years = sorted([s for s in os.listdir(case_dir) if s.isdigit()])
-    fnames = [os.path.join(case_dir, y, 'atmos_4xdaily.nc') for y in years]
+    paths = [os.path.join(case_dir, y, 'atmos_4xdaily.nc') for y in years]
 
-    return fnames
-
-def get_mima_name(field):
-    """
-    Get the name MiMA uses for a physical field.
-
-    Parameters
-    ----------
-    field : str
-        The name of the field.
-
-    Returns
-    -------
-    name : str
-        The name MiMA uses for the field.
-        
-    """
-
-    if field in ('u', 'v', 'T'):
-        return field.lower() + '_gwf'
-
-    if field == 'N':
-        return 'bf_cgwd'
-
-    if field.startswith('gwd'):
-        return f'gwf{field[-1]}_cgwd'
-
-    raise ValueError(f'Unknown field {field}')
+    return paths
