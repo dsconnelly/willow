@@ -8,17 +8,17 @@ import pandas as pd
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.gridspec import GridSpec
-from sklearn.metrics import r2_score
 
 from ..utils.datasets import load_datasets
 from ..utils.plotting import COLORS, format_latitude, format_name
+from ..utils.statistics import R2_score
 from ..utils.wrappers import MiMAModel
 
 def plot_R2_scores(
     data_dir: str,
     model_dirs: list[str],
     output_path: str,
-    n_samples: int=int(1e4),
+    n_samples: int=int(1e6),
 ) -> None:
     """
     Plot training and test R2 scores by level and latitude.
@@ -38,7 +38,7 @@ def plot_R2_scores(
 
     lats = np.linspace(-90, 90, len(X_tr['latitude'].unique()))
     pressures = [s.split(' @ ')[-1].split()[0] for s in Y_tr_df.columns]
-    y = np.arange(-len(pressures), 0)
+    y = -np.arange(len(pressures))
 
     fig = plt.figure(constrained_layout=True)
     axes = _make_axes(fig, pressures)
@@ -94,21 +94,20 @@ def _configure_lev_axis(ax: Axes, pressures: list[str]) -> None:
     Parameters
     ----------
     ax : Axis to configure.
-    pressures : List of formatted pressures at each level, in hPa. Should be
-        subsampled to include only the pressures to include as ticks.
+    pressures : List of formatted pressures at each level, in hPa.
 
     """
     
     scores = [0.2, 0.4, 0.8, 0.6, 1]
-    y = np.arange(-len(pressures), 0)
+    y = -np.arange(len(pressures))
     
     ax.set_xticks(scores)
     ax.set_xticklabels(scores, rotation=45)
     ax.set_xlim(scores[0], scores[-1])
 
-    ax.set_yticks(y)
-    ax.set_yticklabels(pressures)
-    ax.set_ylim(y[0], y[-1])
+    ax.set_yticks(y[::3])
+    ax.set_yticklabels(pressures[::3])
+    ax.set_ylim(y[-1], y[0])
 
     ax.set_xlabel('$R^2$')
     ax.set_ylabel('pressure (hPa)')
@@ -134,21 +133,15 @@ def _get_scores(
 
     """
 
+    output = model.predict(X)
+    by_lev = R2_score(Y, output, reduce=False)
+
     lats = np.sort(X['latitude'].unique())
-    by_lev = np.zeros(Y.shape[1])
     by_lat = np.zeros(len(lats))
 
-    output = model.predict(X)
     for i, lat in enumerate(lats):
         idx = X['latitude'] == lat
-        weight = idx.sum() / len(X)
-
-        with np.errstate(divide='ignore'):
-            scores = r2_score(Y[idx], output[idx], multioutput='raw_values')
-            scores[np.isinf(scores)] = np.nan
-
-        by_lev = by_lev + weight * scores
-        by_lat[i] = np.nanmean(scores)
+        by_lat[i] = R2_score(Y[idx], output[idx])
 
     return by_lev, by_lat
 
@@ -170,7 +163,7 @@ def _make_axes(fig: Figure, pressures: list[str]) -> list[Axes]:
     gs = GridSpec(ncols=2, nrows=1, width_ratios=[1, 2], figure=fig)
     axes = [fig.add_subplot(gs[0, i]) for i in range(2)]
 
-    _configure_lev_axis(axes[0], pressures[::3])
+    _configure_lev_axis(axes[0], pressures)
     _configure_lat_axis(axes[1])
 
     for ax in axes:

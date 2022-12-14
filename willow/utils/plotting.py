@@ -84,4 +84,4 @@ def format_pressure(p: float) -> str:
     if p < 10:
         return f'{p:.1f}'
 
-    return str(round(p, 0))
+    return str(int(round(p, 0)))

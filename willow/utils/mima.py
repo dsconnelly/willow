@@ -1,5 +1,12 @@
 import os
 
+import xarray as xr
+
+from cftime import num2date
+
+_CALENDAR = '360_day'
+_UNITS = 'days since 0001-01-01 00:00:00'
+
 def get_paths(case_dir: str) -> list[str]:
     """
     Get the paths to files containing MiMA output.
@@ -20,3 +27,22 @@ def get_paths(case_dir: str) -> list[str]:
     paths = [os.path.join(case_dir, y, 'atmos_4xdaily.nc') for y in years]
 
     return paths
+
+def open_mima_output(src: str | list[str]) -> xr.Dataset:
+    """
+    Read MiMA output files and decode the time coordinate.
+
+    Parameters
+    ----------
+    src : Path or list of paths to netCDF files to read.
+
+    Returns
+    -------
+    ds : `Dataset` with decoded time coordinate.
+
+    """
+
+    ds = xr.open_mfdataset(src, decode_times=False)
+    ds['time'] = num2date(ds['time'].values, _UNITS, _CALENDAR)
+
+    return ds
