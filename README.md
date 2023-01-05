@@ -3,32 +3,20 @@
 At present, `willow` provides straightforward and well-documented functions for training emulators, running them online in [MiMA](https://github.com/mjucker/MiMA), and conducting various analyses of offline and online performance. Usage help can be displayed from the command line.
 ```console
 $ python -m willow -h
-usage: __main__.py [-h]
-                   {make-datasets,train-emulator,setup-mima,plot-example-profiles,plot-offline-scores,save-shapley-scores,plot-shapley-scores,plot-lmis,plot-online-profiling,plot-climatologies,plot-distributions,plot-qbos,plot-ssws}
-                   ...
+usage: __main__.py [-h] {save-datasets,train-emulator,plot-R2-scores,plot-feature-importances,initialize-coupled-run,plot-qbos} ...
 
 positional arguments:
-  {make-datasets,train-emulator,setup-mima,plot-example-profiles,plot-offline-scores,save-shapley-scores,plot-shapley-scores,plot-lmis,plot-online-profiling,plot-climatologies,plot-distributions,plot-qbos,plot-ssws}
-    make-datasets       Read MiMA output data and save training and test sets.
+  {save-datasets,train-emulator,plot-R2-scores,plot-feature-importances,initialize-coupled-run,plot-qbos}
+    save-datasets       Read MiMA output files and save training and test sets.
     train-emulator      Train a forest or neural network emulator.
-    setup-mima          Set up a MiMA run with an emulator for online testing.
-    plot-example-profiles
-                        Plot a wind profile and the corresponding gravity wave drags.
-    plot-offline-scores
-                        Plot training and test R-squared scores by level and latitude.
-    save-shapley-scores
-                        Compute and save Shapley values for plotting later.
-    plot-shapley-scores
-                        Plot Shapley values for predictions at several levels.
-    plot-lmis           Plot the Shapley levels of maximum importance for one or more models.
-    plot-online-profiling
-                        Plot online runtime of gravity wave drag parameterizations.
-    plot-climatologies  Plot climatological means of outputs from MiMA runs.
-    plot-distributions  Make a plot comparing distributions of a MiMA output variable.
+    plot-R2-scores      Plot training and test R2 scores by level and latitude.
+    plot-feature-importances
+                        Plot Shapley values or Gini importances.
+    initialize-coupled-run
+                        Set up a MiMA run coupled with a data-driven emulator for online testing.
     plot-qbos           Plot quasi-biennial oscillations from one or more MiMA runs.
-    plot-ssws           Make a bar graph of the sudden stratospheric warming occurrences in MiMA.
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
 ```
 Each option also has its own help message.
@@ -40,10 +28,9 @@ Train a forest or neural network emulator.
 
 positional arguments:
   data-dir    Directory where training and test datasets are saved.
-  model-dir   Directory where trained model will be saved. The hyphen-separated prefix of the directory name will be used to determine the kind of model. If
-              the prefix is one of 'mubofo', 'random', or 'xgboost', then the appropriate kind of forest will be trained; otherwise, a neural network will be
-              trained and the prefix should be the name of a class defined in -architectures.py.
+  model-dir   Directory where the trained model will be saved. The prefix of separated by a hyphen, is used to determine the kind of model. If the prefix is one of `'mubofo'` or `'random'`, then the
+              appropriate kind of forest will be trained; otherwise, a neural network will be trained and the prefix should be the name of a class defined in `networks.py`.
 
-optional arguments:
+options:
   -h, --help  show this help message and exit
 ```
