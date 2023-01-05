@@ -4,8 +4,7 @@ from typing import Any
 
 import numpy as np
 
-from mubofo import BoostedForestRegressor
-from sklearn.ensemble import RandomForestRegressor
+from mubofo import MultioutputBoostedForest, MultioutputRandomForest
 
 from ..utils.aliases import Forest
 
@@ -21,7 +20,7 @@ _EXTRA_KWARGS: dict[str, Any] = {
     'val_size' : 0.2,
     'threshold' : 0.001,
     'max_patience' : 25,
-    'verbose' : True
+    'logging' : True
 }
 
 def train_forest(X: np.ndarray, Y: np.ndarray, model_name: str) -> Forest:
@@ -48,11 +47,11 @@ def train_forest(X: np.ndarray, Y: np.ndarray, model_name: str) -> Forest:
     model_class: type[Forest]
 
     if kind == 'mubofo':
-        model_class = BoostedForestRegressor
+        model_class = MultioutputBoostedForest
         kwargs.update(_EXTRA_KWARGS)
 
     elif kind == 'random':
-        model_class = RandomForestRegressor
+        model_class = MultioutputRandomForest
 
     logging.info(f'Training a {model_class.__name__}.')
     _override_parameters(model_name, kwargs)

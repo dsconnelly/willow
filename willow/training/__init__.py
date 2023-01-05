@@ -3,12 +3,10 @@ import os
 
 import joblib
 import numpy as np
-import torch
 
 from .forests import train_forest
 from .networks import train_network
 
-from ..utils.aliases import Model
 from ..utils.datasets import load_datasets, prepare_datasets
 from ..utils.diagnostics import log, profile
 from ..utils.statistics import standardize
@@ -42,7 +40,12 @@ def train_emulator(data_dir: str, model_dir: str) -> None:
 
     logging.info(f'Loaded {X.shape[0]} training samples.')
     train_func = train_forest if kind in ['mubofo', 'random'] else train_network
-    model = train_func(X, Y_scaled, model_name)
+
+    np.save('X-p.npy', X)
+    np.save('Y-p.npy', Y_scaled)
+
+    with np.errstate(invalid='raise'):
+        model = train_func(X, Y_scaled, model_name)
 
     wrapper = MiMAModel(model_name, model, means, stds, col_idx)
     joblib.dump(wrapper, os.path.join(model_dir, 'model.pkl'))

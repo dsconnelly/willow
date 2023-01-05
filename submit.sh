@@ -6,125 +6,38 @@ python () {
         "source /ext3/activate.sh; ${cmd}"
 }
 
-suffix=$1
-ddir="data/ad99-control-1e7"
-cdir="/scratch/dsc7746/cases"
-perturb=""
+data_dir="data/ad99-control"
+case_dir="/scratch/dsc7746/cases/control"
 
-kinds=(
-    mubofo
-    xgboost
-    random
-    WaveNet
-)
+submit() {
+    local model_name=$1
+    local model_dir="models/${model_name}"
 
-models=(
+    local train_cmd="train-emulator ${data_dir} ${model_dir}"
+    local train_id=$(sbatch --parsable -J ${model_name}-train willow.slurm $train_cmd)
+
+    local shap_cmd="plot-feature-importances ${data_dir} ${model_dir} plots/manuscript/${model_name}-shapley.png"
+    sbatch -J ${model_name}-shapley --dependency=afterok:${train_id} willow.slurm ${shap_cmd}
+
+    python -m willow initialize-coupled-run ${case_dir}/ad99 ${model_dir}
+    sbatch --dependency=afterok:${train_id} ${case_dir}/${model_name}/submit.slurm
+}
+
+model_names=(
     mubofo-wind
     mubofo-wind-T
-    mubofo-wind-Nsq
-    mubofo-wind-shear
-    mubofo-shear-Nsq
     mubofo-wind-T-noloc
-
-    xgboost-wind-T
-    xgboost-wind-shear
+    mubofo-wind-shear
+    mubofo-wind-T-n_estimators_10000-max_depth_2-max_features_0.9-max_samples_0.9
 
     random-wind-T
     random-wind-shear
 
     WaveNet-wind
     WaveNet-wind-T
-    WaveNet-wind-Nsq
-    WaveNet-wind-T-noloc
+    WaveNet-wind-noloc
 )
 
-case $2 in
-
-    "train")
-        for model in "${models[@]}"; do
-            name="${model}-${suffix}"
-            args="train-emulator ${ddir} models/${name}"
-            sbatch -J "${name}-train" willow.slurm ${args}
-        done
-        ;;
-
-    "plot-offline")
-        for kind in "${kinds[@]}"; do
-            use=""
-            for model in "${models[@]}"; do
-                if [[ $model == ${kind}-* ]]; then
-                    use="${use}models/${model}-${suffix},"
-                fi
-            done
-
-            fname="plots/sparc-fall-22/scores/${kind}-${suffix}-scores.png"
-            args="${ddir} ${use%?} ${fname}"
-            python -m willow plot-offline-scores ${args}
-        done
-        ;;
-
-    "plot-shapley")
-        odir="plots/sparc-fall-22/shapley"
-        for model in "${models[@]}"; do
-            name="${model}-${suffix}"
-            cmd="plot-feature-importances"
-            
-            args="${cmd} models/${name} ${odir} shapley --data-dir ${ddir}"
-            sbatch -J "${name}-shapley" willow.slurm ${args}
-        done
-        ;;
-
-    "online")
-        for model in "${models[@]}"; do
-            name="${model}-${suffix}"
-            newcase="${cdir}/${name}-${perturb}"
-            
-            args="setup-mima ${cdir}/ad99-${perturb} models/${name}"
-            python -m willow ${args} --case-dir ${newcase}
-            sbatch "${newcase}/submit.slurm"
-        done
-        ;;
-
-    "plot-profiling")
-        use="${cdir}/profiling"
-        for model in "${models[@]}"; do
-            use="${use},${cdir}/${model}-${suffix}"
-        done
-
-        args="${use} plots/profiling/profiling-${suffix}.png"
-        python -m willow plot-online-profiling ${args}
-        ;;
-
-    "plot-qbos")
-        for kind in "${kinds[@]}"; do
-            use="${cdir}/ad99-${perturb}"
-            for model in "${models[@]}"; do
-                if [[ $model == ${kind}-* ]]; then
-                    use="${use},${cdir}/${model}-${suffix}-${perturb}"
-                fi
-            done
-
-            args="${use} plots/sparc-fall-22/qbos/${kind}-qbos-${suffix}-${perturb}.png"
-            python -m willow plot-qbos ${args}
-        done
-        ;;
-
-    "plot-ssws")
-        for kind in "${kinds[@]}"; do
-            use="${cdir}/ad99-${perturb}"
-            for model in "${models[@]}"; do
-                if [[ $model == ${kind}-* ]]; then
-                    use="${use},${cdir}/${model}-${suffix}-${perturb}"
-                fi
-            done
-
-            args="${use} plots/ssws/${kind}-ssws-${suffix}-${perturb}.png"
-            python -m willow plot-ssws ${args}
-        done
-        ;;
-
-    *)
-        echo "unknown command $2"
-        ;;
-        
-esac
+for model_name in "${model_names[@]}"; do
+    submit "${model_name}-${1}"
+done
