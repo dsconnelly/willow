@@ -29,7 +29,7 @@ Train a forest or neural network emulator.
 positional arguments:
   data-dir    Directory where training and test datasets are saved.
   model-dir   Directory where the trained model will be saved. The prefix of separated by a hyphen, is used to determine the kind of model. If the prefix is one of `'mubofo'` or `'random'`, then the
-              appropriate kind of forest will be trained; otherwise, a neural network will be trained and the prefix should be the name of a class defined in `networks.py`.
+              appropriate kind of forest will be trained; otherwise, a neural network will be trained and the prefix should be the name of a class defined in `architectures.py`.
 
 options:
   -h, --help  show this help message and exit

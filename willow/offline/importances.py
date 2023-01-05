@@ -58,7 +58,7 @@ def plot_feature_importances(
     elif kind == 'gini':
         forests = (MultioutputBoostedForest, MultioutputRandomForest)
         if not isinstance(model, forests):
-            raise TypeError('Only Forest models support Gini importances')
+            raise TypeError('Only forest models support Gini importances')
 
         importances = model.feature_importances_
     

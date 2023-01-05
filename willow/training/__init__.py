@@ -2,7 +2,6 @@ import logging
 import os
 
 import joblib
-import numpy as np
 
 from .forests import train_forest
 from .networks import train_network
@@ -27,7 +26,7 @@ def train_emulator(data_dir: str, model_dir: str) -> None:
         separated by a hyphen, is used to determine the kind of model. If the
         prefix is one of `'mubofo'` or `'random'`, then the appropriate kind of
         forest will be trained; otherwise, a neural network will be trained and
-        the prefix should be the name of a class defined in `networks.py`.
+        the prefix should be the name of a class defined in `architectures.py`.
 
     """
 
@@ -40,12 +39,7 @@ def train_emulator(data_dir: str, model_dir: str) -> None:
 
     logging.info(f'Loaded {X.shape[0]} training samples.')
     train_func = train_forest if kind in ['mubofo', 'random'] else train_network
-
-    np.save('X-p.npy', X)
-    np.save('Y-p.npy', Y_scaled)
-
-    with np.errstate(invalid='raise'):
-        model = train_func(X, Y_scaled, model_name)
+    model = train_func(X, Y_scaled, model_name)
 
     wrapper = MiMAModel(model_name, model, means, stds, col_idx)
     joblib.dump(wrapper, os.path.join(model_dir, 'model.pkl'))
