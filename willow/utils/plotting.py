@@ -5,7 +5,13 @@ import numpy as np
 COLORS = cycle([
     'tab:red',
     'royalblue',
-    'forestgreen'
+    'forestgreen',
+    'darkorange',
+    'darkviolet',
+    'fuchsia',
+    'gold',
+    'cyan',
+    'lawngreen'
 ])
 
 def format_latitude(lat: float) -> str:

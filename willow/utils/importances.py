@@ -2,6 +2,7 @@ import logging
 import warnings
 
 from collections import defaultdict
+from typing import Optional
 
 import numpy as np
 import torch
@@ -11,9 +12,11 @@ from mubofo import MultioutputBoostedForest, MultioutputRandomForest
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
-    from shap import DeepExplainer, TreeExplainer, kmeans
+    from shap import DeepExplainer, KernelExplainer, TreeExplainer, kmeans
 
-from .aliases import Forest, Model
+from .ad99 import AlexanderDunkerton
+from .aliases import Model
+from .statistics import standardize
 
 def get_profiles(
     importances: np.ndarray,
@@ -54,7 +57,7 @@ def get_profiles(
     return {name : handle(v) for name, v in profiles.items()}
 
 def get_shapley_values(
-    model: Model,
+    model: AlexanderDunkerton | Model,
     X: np.ndarray,
     features: list[str],
     pressures: np.ndarray
@@ -77,7 +80,23 @@ def get_shapley_values(
 
     """
 
-    if isinstance(model, (MultioutputBoostedForest, MultioutputRandomForest)):
+    if isinstance(model, AlexanderDunkerton):
+        Y = model.predict(X)
+        means, stds = Y.mean(axis=0), Y.std(axis=0)
+        f = lambda Z: standardize(model.predict(Z), means, stds)[0]
+
+        m = round(0.8 * X.shape[0])
+        background, X = X[:m], X[m:]
+        background = kmeans(background, 100)
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', category=FutureWarning)
+            warnings.filterwarnings('ignore', module='sklearn.linear_model')
+            
+            explainer = KernelExplainer(f, background)
+            importances = np.stack(explainer.shap_values(X, l1_reg=0))
+
+    elif isinstance(model, (MultioutputBoostedForest, MultioutputRandomForest)):
         _importances = []
         for i, estimator in enumerate(model.estimators_):
             explainer = TreeExplainer(estimator)

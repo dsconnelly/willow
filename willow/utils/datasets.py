@@ -75,9 +75,6 @@ def prepare_datasets(
         which can be `'wind'`, `'shear'`, `'T'`, and `'N'`. Location variables
         (surface pressure and latitude) will be included unless `'noloc'` is in
         the list.
-    return_col_idx : Whether to return the indices corresponding to the
-        returned columns of `X`. These indices are useful for coupling models to 
-        MiMA, where the model needs to extract features from an unlabled array.
 
     Returns
     -------

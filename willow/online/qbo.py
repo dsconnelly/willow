@@ -42,8 +42,8 @@ def plot_qbos(case_dirs: list[str], output_path: str) -> None:
                 axes.append(fig.add_subplot(gs[i, j]))
 
     levels = np.linspace(-_VMAX, _VMAX, 13)
-    for case_dir, ax in zip(case_dirs, axes):
-        u = load_qbo(case_dir, n_years=12)
+    for i, (case_dir, ax) in enumerate(zip(case_dirs, axes)):
+        u = load_qbo(case_dir, n_years=24)
         period, period_err, amp, amp_err = get_qbo_statistics(u)
         time = u['time'].values
 
@@ -84,7 +84,7 @@ def plot_qbos(case_dirs: list[str], output_path: str) -> None:
         )
 
         model_name = os.path.basename(case_dir)
-        ax.set_title(format_name(model_name))
+        ax.set_title(f'({chr(97 + i)}) {format_name(model_name)}')
 
     cax = fig.add_subplot(gs[-1, :])
     cbar = plt.colorbar(img, cax=cax, orientation='horizontal')

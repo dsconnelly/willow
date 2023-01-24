@@ -7,6 +7,10 @@ from cftime import num2date
 _CALENDAR = '360_day'
 _UNITS = 'days since 0001-01-01 00:00:00'
 
+R_dry = 287.04
+c_p = 7 * R_dry / 2
+grav = 9.8
+
 def get_paths(case_dir: str) -> list[str]:
     """
     Get the paths to files containing MiMA output.
