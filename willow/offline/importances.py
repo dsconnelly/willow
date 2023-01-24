@@ -12,111 +12,132 @@ from ..utils.aliases import Model
 from ..utils.datasets import load_datasets, _get_columns_and_index
 from ..utils.diagnostics import log
 from ..utils.importances import get_profiles, get_shapley_values
-from ..utils.plotting import COLORS, format_pressure
+from ..utils.plotting import COLORS, format_name, format_pressure
 
-@log
+# @log
 def plot_feature_importances(
     data_dir: str,
-    model_dir: str,
+    model_dirs: list[str],
     output_path: str,
-    kind: str='shapley',
+    gini: bool=False,
     levels: list[float]=[200, 100, 10]
 ) -> None:
     """
-    Plot Shapley values or Gini importances.
+    Plot Shapley values and potentially Gini importances.
 
     Parameters
     ----------
     data_dir : Directory where test samples are saved.
-    model_dir : Directory where trained model is saved. Alternatively, can be
-        a directory name containing `'ad99'`, in which case the Shapley values
-        of the parameterization itself are computed.
+    model_dirs : Directories where trained models are saved. Can include a
+        directory name containing `'ad99'`, in which case the Shapley values of
+        the parameterization itself are computed.
     output_path : Path where image will be saved.
-    kind : Kind of feature importance to plot; either `'shapley'`, `'gini'`, or
-        `'both'`, where `'both'` plots both Gini and Shapley scores.
+    gini : Whether to also plot Gini importances.
     levels : List of output levels, in hPa, to show importance profiles at.
 
     """
 
-    col_idx: np.ndarray
-    model: AlexanderDunkerton | Model
+    if len(model_dirs) > 1 and gini:
+        raise ValueError('Cannot plot multiple models and Gini importances')
+
     X, Y = load_datasets(data_dir, 'te', n_samples=int(1e3))
-    
-    if 'ad99' in model_dir:
-        name_parts = {'wind', 'T'}
-        model = AlexanderDunkerton()
-        _, col_idx = _get_columns_and_index(name_parts, X.columns)
-
-    else:
-        wrapper = joblib.load(os.path.join(model_dir, 'model.pkl'))
-        col_idx = wrapper.col_idx
-        model = wrapper.model
-
-    features = X.columns[col_idx].tolist()
     pressures = np.array([s.split(' @ ')[-1].split()[0] for s in Y.columns])
     pressures = pressures.astype(float)
 
-    importances = {}
-    if kind in ('gini', 'both'):
-        forests = (MultioutputBoostedForest, MultioutputRandomForest)
-        if not isinstance(model, forests):
-            raise TypeError('Only forest models support Gini importances')
+    y = -np.arange(len(pressures))
+    labels = [format_pressure(p) for p in pressures]
 
-        importances['gini'] = model.feature_importances_
+    col_idx: np.ndarray
+    model: AlexanderDunkerton | Model
 
-    if kind in ('shapley', 'both'):
+    importances, features = {}, {}
+    for model_dir in model_dirs:
+        if 'ad99' in model_dir:
+            name_parts = {'wind', 'T'}
+            model = AlexanderDunkerton()
+            _, col_idx = _get_columns_and_index(name_parts, X.columns)
+
+        else:
+            wrapper = joblib.load(os.path.join(model_dir, 'model.pkl'))
+            col_idx = wrapper.col_idx
+            model = wrapper.model
+
+        name = 'shapley' if gini else os.path.basename(model_dir)
+        features[name] = X.columns[col_idx].tolist()
+
         path = os.path.join(model_dir, 'shapley.nc')
-
         if os.path.exists(path):
             ds = xr.open_dataset(path)
 
         else:
-            X = X.iloc[:, col_idx]
-            ds = get_shapley_values(model, X.to_numpy(), features, pressures)
+            samples = X.iloc[:, col_idx].to_numpy()
+            ds = get_shapley_values(model, samples, features[name], pressures)
             ds.to_netcdf(path)
 
-        importances['shapley'] = abs(ds['importances']).mean('sample').values
+        importances[name] = abs(ds['importances']).mean('sample').values
+        if gini:
+            forests = (MultioutputBoostedForest, MultioutputRandomForest)
+            if not isinstance(model, forests):
+                raise TypeError('Only forest models support Gini importances')
+
+            importances['gini'] = model.feature_importances_
+            features['gini'] = features['shapley']
 
     n_subplots = len(levels)
     fig, axes = plt.subplots(ncols=n_subplots)
     fig.set_size_inches(3 * n_subplots, 6)
 
-    y = -np.arange(len(pressures))
-    labels = [format_pressure(p) for p in pressures]
-    cmap = dict(zip(['gini', 'shapley'], COLORS))
+    cmap = dict(zip(importances.keys(), COLORS))
+    for name in cmap:
+        if 'ad99' in name:
+            cmap[name] = 'k'
 
-    xmax = -np.inf
-    for i, (level, ax) in enumerate(zip(levels, axes)):
+    xmaxes = {name : -np.inf for name in importances}
+    make_twin = lambda ax, name: ax.twiny() if name == 'gini' else ax
+    groups = [{name : make_twin(ax, name) for name in cmap} for ax in axes]
+
+    for i, (level, group) in enumerate(zip(levels, groups)):
         j = np.argmin(abs(pressures - level))
-        ax.barh([y[j]], [1], color='lightgray', height=1, zorder=-2)
-
-        for kind, data in importances.items():
-            profiles = list(get_profiles(data[:, j], features).values())
+        for name, data in importances.items():
+            profiles = list(get_profiles(data[:, j], features[name]).values())
             profile = np.stack(profiles).sum(axis=0)
-            profile = profile / profile.sum()
-            
-            color = cmap[kind]
+            xmaxes[name] = max(xmaxes[name], profile.max())
+
+            ax, color = group[name], cmap[name]
+            kind = name if name == 'gini' else 'shapley'
+            ax.set_xlabel(f'{kind.capitalize()} importance')
+
+            if name == kind:
+                side = dict(shapley='bottom', gini='top')[kind]
+                ax.spines[side].set_color(color)
+                if kind == 'gini': ax.spines['bottom'].set_visible(False)
+
+                ax.tick_params(axis='x', colors=color)
+                ax.xaxis.label.set_color(color)
+
+            label = None if gini else format_name(name, True)
+            ax.scatter(profile, y, color=color, label=label)
             ax.plot(profile, y, color=color, alpha=0.3, zorder=-1)
-            ax.scatter(profile, y, color=color, label=kind.capitalize())
-            xmax = max(xmax, profile.max())
+
+        ax.barh([y[j]], [10], height=1, color='lightgray', zorder=-2)
 
         ax.set_yticks(y[::3])
         ax.set_yticklabels(labels[::3])
         ax.set_ylim(y[-1], y[0])
 
-        ax.set_xlabel(f'normalized importance')
         ax.set_ylabel('input pressure (hPa)')
-        
         ax.set_title(f'{labels[j]} hPa')
-        if i == 0 and len(importances) > 1:
+
+        if len(model_dirs) > 1 and i == 0:
             ax.legend()
 
-    xmax = 1.2 * xmax
-    ticks = np.round(np.linspace(0, xmax, 5), 2)
+    if not gini: xmaxes = {name : max(xmaxes.values()) for name in xmaxes}
+    for name, xmax in xmaxes.items():
+        ticks = np.round(np.linspace(0, 1.2 * xmax, 5), 2)
 
-    for ax in axes:
-        ax.set_xlim(0, ticks[-1])
-        ax.set_xticks(ticks)
+        for group in groups:
+            group[name].set_xlim(0, ticks[-1])
+            group[name].set_xticks(ticks)
 
     plt.tight_layout()
     plt.savefig(output_path)

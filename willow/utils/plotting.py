@@ -35,13 +35,14 @@ def format_latitude(lat: float) -> str:
 
     return f'$\mathregular{{ {value}^o {suffix} }}$'
 
-def format_name(name: str) -> str:
+def format_name(name: str, simple=False) -> str:
     """
     Format the name of a model or MiMA run for reasonable display.
 
     Parameters
     ----------
     name : Name of the model or MiMA run.
+    simple : Whether to just return the kind of model.
 
     Returns
     -------
@@ -58,6 +59,9 @@ def format_name(name: str) -> str:
         'random' : 'random forest',
         'WaveNet' : 'neural network'
     }[kind]
+
+    if simple:
+        return kind
 
     features = [s for s in name_parts if s in ['wind', 'shear', 'N', 'T']]
     if 'noloc' not in name_parts:
