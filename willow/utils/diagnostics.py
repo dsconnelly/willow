@@ -25,7 +25,11 @@ def log(func: Callable) -> Callable:
 
     @functools.wraps(func)
     def func_with_logging(*args, **kwargs):
-        model_dir = kwargs['model_dir']
+        try:
+            model_dir = kwargs['model_dir']
+        except KeyError:
+            model_dir = kwargs['model_dirs'][0]
+
         if not os.path.exists(model_dir):
             os.makedirs(model_dir)
 

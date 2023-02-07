@@ -6,12 +6,10 @@ import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.gridspec import GridSpec
 
-from ..utils.plotting import format_name, format_pressure
+from ..utils.plotting import get_rows_and_columns, format_name, format_pressure
 from ..utils.qbo import get_qbo_statistics, load_qbo
 
 _CBAR_SCALE = 0.1
-_SUBPLOTS_PER_COL = 3
-
 _CMAP = 'RdBu_r'
 _VMAX = 75
 
@@ -27,8 +25,7 @@ def plot_qbos(case_dirs: list[str], output_path: str) -> None:
     """
 
     n_subplots = len(case_dirs)
-    n_rows = min(n_subplots, _SUBPLOTS_PER_COL)
-    n_cols = (n_subplots - 1) // _SUBPLOTS_PER_COL + 1
+    n_rows, n_cols = get_rows_and_columns(n_subplots)
 
     fig = plt.figure(constrained_layout=True)
     height_ratios = [1] * n_rows + [_CBAR_SCALE]
@@ -43,7 +40,7 @@ def plot_qbos(case_dirs: list[str], output_path: str) -> None:
 
     levels = np.linspace(-_VMAX, _VMAX, 13)
     for i, (case_dir, ax) in enumerate(zip(case_dirs, axes)):
-        u = load_qbo(case_dir, n_years=24)
+        u = load_qbo(case_dir)
         period, period_err, amp, amp_err = get_qbo_statistics(u)
         time = u['time'].values
 

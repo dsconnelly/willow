@@ -18,10 +18,7 @@ from .ad99 import AlexanderDunkerton
 from .aliases import Model
 from .statistics import standardize
 
-def get_profiles(
-    importances: np.ndarray,
-    features: list[str]
-) -> dict[str, np.ndarray]:
+def get_profile(importances: np.ndarray, features: list[str]) -> np.ndarray:
     """
     Get importances of features with vertical profiles.
 
@@ -32,8 +29,7 @@ def get_profiles(
 
     Returns
     -------
-    profiles : Dictionary whose keys are the names of the profiles and whose
-        values are arrays of feature importances.
+    profile : Array of total importance at each level.
     
     """
 
@@ -54,10 +50,11 @@ def get_profiles(
 
         return out
 
-    return {name : handle(v) for name, v in profiles.items()}
+    return sum((handle(v) for _, v in profiles.items()), np.zeros(40))
 
 def get_shapley_values(
     model: AlexanderDunkerton | Model,
+    background: np.ndarray,
     X: np.ndarray,
     features: list[str],
     pressures: np.ndarray
@@ -68,8 +65,8 @@ def get_shapley_values(
     Parameters
     ----------
     model : Trained model for which to compute the Shapley values.
-    X : Array of input samples containing only those features used
-        by `model`.
+    background : Array of samples to use as background data.
+    X : Array of input samples to compute Shapley values for.
     features : List of input features for the returned `Dataset`.
     pressures : Array of output pressures for the returned `Dataset`.
 
@@ -81,18 +78,15 @@ def get_shapley_values(
     """
 
     if isinstance(model, AlexanderDunkerton):
-        Y = model.predict(X)
+        Y = model.predict(background)
         means, stds = Y.mean(axis=0), Y.std(axis=0)
         f = lambda Z: standardize(model.predict(Z), means, stds)[0]
-
-        m = round(0.8 * X.shape[0])
-        background, X = X[:m], X[m:]
-        background = kmeans(background, 100)
 
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', category=FutureWarning)
             warnings.filterwarnings('ignore', module='sklearn.linear_model')
             
+            background = kmeans(background, 100)
             explainer = KernelExplainer(f, background)
             importances = np.stack(explainer.shap_values(X, l1_reg=0))
 
@@ -104,14 +98,13 @@ def get_shapley_values(
             logging.info(f'Computed Shapley values for tree {i + 1}.')
 
         importances = sum(_importances)
-        if isinstance(model, MultioutputRandomForest):
+        if isinstance(model, MultioutputBoostedForest):
+            importances *= model.learning_rate
+        elif isinstance(model, MultioutputRandomForest):
             importances /= len(model.estimators_)
-
+        
     elif isinstance(model, torch.nn.Module):
-        m = round(0.8 * X.shape[0])
-        background, X = X[:m], X[m:]
         background = kmeans(background, 100).data
-
         explainer = DeepExplainer(model, torch.tensor(background))
         importances = np.stack(explainer.shap_values(torch.tensor(X)))
 

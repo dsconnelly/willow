@@ -35,12 +35,11 @@ if [ -n "$sep" ]; then
 fi
 
 for model_name in ${model_names[@]}; do
-
-    if [[ $model_name != *${filter}* ]]; then
+    s="${prefix}${model_name}${suffix}"
+    if [[ $s != *${filter}* ]]; then
         continue
     fi
 
-    s="${prefix}${model_name}${suffix}"
     if [ -n "$sep" ]; then
         out="${out}${s}${sep}"
     else

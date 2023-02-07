@@ -36,28 +36,25 @@ def get_qbo_statistics(u: xr.DataArray) -> tuple[float, float, float, float]:
 
     return period, period_err, amp, amp_err
 
-def load_qbo(case_dir: str, n_years: Optional[int]=None) -> xr.DataArray:
+def load_qbo(case_dir: str) -> xr.DataArray:
     """
     Load the QBO wind from a MiMA run.
 
     Parameters
     ----------
-    case_dir : Directory where MiMA was run. Should contain either a file named
-        `qbo.nc` or subdirectories named with two-digit integers coresponding to
-        each of which contains an `atmos_4xdaily.nc` file.
-    n_years : Number of years of data to return. If `None`, the whole run except
-        the first three years will be returned.
+    case_dir : Directory where MiMA was run. Must contain a file named `qbo.nc`.
+
+    Returns
+    -------
+    u : DataArray of QBO (tropical zonal mean) winds.
 
     """
 
-    with open_mima_output(os.path.join(case_dir, 'qbo.nc')) as ds:
+    path = os.path.join(case_dir, 'qbo.nc')
+    with open_mima_output(path, n_years=24) as ds:
         u = ds['u_gwf'].sel(pfull=slice(None, 115))
 
-    time = u['time'].values
-    n_available = round((time[-1] - time[0]).days / 360) - 3
-    n_years = min(n_years, n_available) if n_years else n_available
-
-    return u.isel(time=slice(-(360 * n_years), None)).load()
+    return u.load()
 
 def _apply_butterworth(u: xr.DataArray) -> xr.DataArray:
     """
@@ -105,7 +102,7 @@ def _get_qbo_amplitude(u: xr.DataArray, level: float=10) -> tuple[float, float]:
 def _get_qbo_period(
     u: xr.DataArray,
     level: float=10,
-    method: str='crossings'
+    method: str='fourier'
 ) -> tuple[float, float]:
     """
     Calculate the QBO period at a given pressure level.
@@ -153,7 +150,7 @@ def _get_qbo_period(
         starts, ends = starts[starts < k], ends[ends > k]
 
         left = np.nan if not starts.size else periods[starts[-1]]
-        right = np.nan if not ends else periods[ends[0]]
+        right = np.nan if not ends.size else periods[ends[0]]
         error = np.nanmax([left - period, period - right])
 
         return period, error

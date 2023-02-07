@@ -7,7 +7,8 @@ python () {
 }
 
 data_dir="data/ad99-control"
-case_dir="/scratch/dsc7746/cases/control"
+control_dir="/scratch/dsc7746/cases/control"
+warm_dir="/scratch/dsc7746/cases/4xco2"
 suffix="s"
 
 submit() {
@@ -20,8 +21,11 @@ submit() {
     local shap_cmd="plot-feature-importances ${data_dir} ${model_dir} plots/manuscript/${model_name}-shapley.png"
     sbatch -J ${model_name}-shapley --dependency=afterok:${train_id} willow.slurm ${shap_cmd}
 
-    python -m willow initialize-coupled-run ${case_dir}/ad99 ${model_dir}
-    sbatch --dependency=afterok:${train_id} ${case_dir}/${model_name}/submit.slurm
+    python -m willow initialize-coupled-run ${control_dir}/ad99 ${model_dir}
+    sbatch --dependency=afterok:${train_id} ${control_dir}/${model_name}/submit.slurm
+
+    python -m willow initialize-coupled-run ${warm_dir}/ad99 ${model_dir}
+    sbatch --dependency=afterok:${train_id} ${warm_dir}/${model_name}/submit.slurm
 }
 
 model_names=$(./names.sh)

@@ -1,5 +1,7 @@
 import os
 
+from typing import Optional
+
 import xarray as xr
 
 from cftime import num2date
@@ -32,13 +34,18 @@ def get_paths(case_dir: str) -> list[str]:
 
     return paths
 
-def open_mima_output(src: str | list[str]) -> xr.Dataset:
+def open_mima_output(
+    src: str | list[str],
+    n_years: Optional[int]=None
+) -> xr.Dataset:
     """
     Read MiMA output files and decode the time coordinate.
 
     Parameters
     ----------
     src : Path or list of paths to netCDF files to read.
+    n_years : Number of years of data to return. If greater than the length of
+        the run minus three years, only that part of the run will be returned.
 
     Returns
     -------
@@ -49,4 +56,8 @@ def open_mima_output(src: str | list[str]) -> xr.Dataset:
     ds = xr.open_mfdataset(src, decode_times=False)
     ds['time'] = num2date(ds['time'].values, _UNITS, _CALENDAR)
 
-    return ds
+    time = ds['time'].values
+    n_available = round((time[-1] - time[0]).days / 360) - 3
+    n_years = min(n_years, n_available) if n_years else n_available
+
+    return ds.isel(time=slice(-(360 * n_years), None))

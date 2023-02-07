@@ -95,3 +95,29 @@ def format_pressure(p: float) -> str:
         return f'{p:.1f}'
 
     return str(int(round(p, 0)))
+
+def get_rows_and_columns(n_subplots: int) -> tuple[int, int]:
+    """
+    Choose a pleasing arrangement of subplots.
+
+    Parameters
+    ----------
+    n_subplots : Number of subplots to create.
+
+    Returns
+    -------
+    n_rows : Number of rows to use.
+    n_cols : Number of columns to use.
+
+    """
+
+    if n_subplots < 4:
+        return n_subplots, 1
+
+    if not n_subplots % 2:
+        return n_subplots // 2, 2
+
+    if not n_subplots % 3:
+        return n_subplots // 3, 3
+
+    return (n_subplots // 2) + 1, 2
