@@ -1,7 +1,5 @@
 import os
 
-from timeit import timeit
-
 import joblib
 import matplotlib.pyplot as plt
 import numpy as np

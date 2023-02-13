@@ -96,6 +96,22 @@ def format_pressure(p: float) -> str:
 
     return str(int(round(p, 0)))
 
+def get_letter(i: int) -> str:
+    """
+    Return a letter of the alphabet for use in subplot titles.
+
+    Parameters
+    ----------
+    i : Index of the subplot, starting at zero.
+
+    Returns
+    -------
+    letter : `(i + 1)`th letter of the alphabet.
+
+    """
+
+    return chr(97 + i)
+
 def get_rows_and_columns(n_subplots: int) -> tuple[int, int]:
     """
     Choose a pleasing arrangement of subplots.

@@ -6,7 +6,12 @@ import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.gridspec import GridSpec
 
-from ..utils.plotting import get_rows_and_columns, format_name, format_pressure
+from ..utils.plotting import (
+    format_name,
+    format_pressure,
+    get_letter,
+    get_rows_and_columns
+)
 from ..utils.qbo import get_qbo_statistics, load_qbo
 
 _CBAR_SCALE = 0.1
@@ -33,8 +38,8 @@ def plot_qbos(case_dirs: list[str], output_path: str) -> None:
     fig.set_size_inches(9 * n_cols, 3 * (n_rows + _CBAR_SCALE))
 
     axes: list[Axes] = []
-    for j in range(n_cols):
-        for i in range(n_rows):
+    for i in range(n_rows):
+        for j in range(n_cols):
             if len(axes) < n_subplots:
                 axes.append(fig.add_subplot(gs[i, j]))
 
@@ -81,7 +86,7 @@ def plot_qbos(case_dirs: list[str], output_path: str) -> None:
         )
 
         model_name = os.path.basename(case_dir)
-        ax.set_title(f'({chr(97 + i)}) {format_name(model_name)}')
+        ax.set_title(f'({get_letter(i)}) {format_name(model_name)}')
 
     cax = fig.add_subplot(gs[-1, :])
     cbar = plt.colorbar(img, cax=cax, orientation='horizontal')

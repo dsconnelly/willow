@@ -5,6 +5,11 @@ model_names=(
     mubofo-wind-T
     mubofo-wind-T-noloc
     mubofo-wind-shear
+    mubofo-shear-T
+
+    mubofo-wind-T-repeat1
+    mubofo-wind-T-repeat2
+    mubofo-wind-T-repeat3
 
     random-wind-T
     random-wind-shear
@@ -12,6 +17,10 @@ model_names=(
     WaveNet-wind
     WaveNet-wind-T
     WaveNet-wind-noloc
+
+    WaveNet-wind-T-repeat1
+    WaveNet-wind-T-repeat2
+    WaveNet-wind-T-repeat3
 )
 
 prefix=$1

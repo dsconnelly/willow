@@ -14,7 +14,7 @@ from ..utils.aliases import Model
 from ..utils.datasets import load_datasets, _get_columns_and_index
 from ..utils.diagnostics import log
 from ..utils.importances import get_profile, get_shapley_values
-from ..utils.plotting import COLORS, format_name, format_pressure
+from ..utils.plotting import COLORS, format_name, format_pressure, get_letter
 
 @log
 def plot_feature_importances(
@@ -42,8 +42,8 @@ def plot_feature_importances(
     if len(model_dirs) > 1 and gini:
         raise ValueError('Cannot plot multiple models and Gini importances')
 
-    X_tr, _ = load_datasets(data_dir, 'tr', n_samples=int(1e3))
-    X_te, Y = load_datasets(data_dir, 'te', n_samples=int(1e3))
+    X_tr, _ = load_datasets(data_dir, 'tr', n_samples=int(1e6))
+    X_te, Y = load_datasets(data_dir, 'te', n_samples=int(1e4))
    
     pressures = np.array([s.split(' @ ')[-1].split()[0] for s in Y.columns])
     pressures = pressures.astype(float)
@@ -97,7 +97,8 @@ def plot_feature_importances(
     y = -np.arange(len(pressures))
     labels = [format_pressure(p) for p in pressures]
 
-    cmap = dict(zip([s for s in importances.keys() if 'ad99' not in s], COLORS))
+    keys = [s for s in importances.keys() if 'ad99' not in s]
+    cmap = dict(zip(keys, COLORS))
     cmap['ad99-wind-T'] = 'k'
 
     xmaxes = {name : -np.inf for name in importances}
@@ -111,11 +112,11 @@ def plot_feature_importances(
             xmaxes[name] = max(xmaxes[name], profile.max())
 
             ax, color = group[name], cmap[name]
-            kind = name if name == 'gini' else 'shapley'
-            ax.set_xlabel(f'{kind.capitalize()} importance')
+            kind = name.capitalize() if name == 'gini' else 'SHAP'
+            ax.set_xlabel(f'{kind} importance')
 
-            if name == kind:
-                side = dict(shapley='bottom', gini='top')[kind]
+            if kind.lower() in name:
+                side = dict(shapley='bottom', gini='top')[name]
                 ax.spines[side].set_color(color)
                 if kind == 'gini': ax.spines['bottom'].set_visible(False)
 
@@ -126,6 +127,7 @@ def plot_feature_importances(
             ax.scatter(profile, y, color=color, label=label)
             ax.plot(profile, y, color=color, alpha=0.3, zorder=1)
 
+        if 'gini' in group: ax = group['shapley']
         ax.barh([y[j]], [10], height=1, color='lightgray', zorder=-2)
 
         ax.set_yticks(y[::3])
@@ -133,7 +135,7 @@ def plot_feature_importances(
         ax.set_ylim(y[-1], y[0])
 
         ax.set_ylabel('input pressure (hPa)')
-        ax.set_title(f'{labels[j]} hPa')
+        ax.set_title(f'({get_letter(i)}) {labels[j]} hPa')
 
         if len(model_dirs) > 1 and i == 0:
             ax.legend()
@@ -149,73 +151,72 @@ def plot_feature_importances(
     plt.tight_layout()
     plt.savefig(output_path)
 
-def plot_importance_correlations(
+def plot_shapley_analytics(
+    ref_dir: str,
     model_dirs: list[str],
     output_path: str
 ) -> None:
     """
-    Plot correlation of Shapley value profiles as a function of height.
+    Plot disentangled shape and ampltitude analyses of Shapley profiles.
 
     Parameters
     ----------
-    model_dirs : Directories where model Shapley values are saved. Should
-        include a directory where AD99 Shapley values are saved.
+    ref_dir : Directory where ground truth Shapley values are saved.
+    model_dirs : Directories where model Shapley values are saved.
     output_path : Path where image will be saved.
 
     """
 
-    profiles: defaultdict[str, np.ndarray]
-    profiles = defaultdict(lambda: np.zeros(40))
-    profiles['AD99'] = np.zeros((40, 40))
+    corrs: defaultdict[str, np.ndarray]
+    sums: defaultdict[str, np.ndarray]
 
-    for model_dir in model_dirs:
-        path = os.path.join(model_dir, 'shapley.nc')
-        name = format_name(os.path.basename(model_dir), True)
+    references = np.zeros((40, 40))
+    corrs = defaultdict(lambda: np.zeros(40))
+    sums = defaultdict(lambda: np.zeros(40))
 
-        with xr.open_dataset(path) as ds:
-            features = list(ds.feature.values)
-            pressures = list(ds.pressure.values)
-
-            ds = ds.isel(sample=(abs(ds['X'].values[:, -1]) < 5))
-            importances = abs(ds['importances']).mean('sample').values
+    path = os.path.join(ref_dir, 'shapley.nc')
+    with xr.open_dataset(path) as ds:
+        features = list(ds.feature.values)
+        pressures = list(ds.pressure.values)
+        importances = abs(ds['importances']).mean('sample').values
 
         for j in range(40):
+            references[j] = get_profile(importances[:, j], features)
+
+    for model_dir in model_dirs:
+        name = os.path.basename(model_dir)
+        path = os.path.join(model_dir, 'shapley.nc')
+
+        with xr.open_dataset(path) as ds:
+            importances = abs(ds['importances']).mean('sample').values
+
+        for j in range(39):
             profile = get_profile(importances[:, j], features)
-            if name == 'AD99':
-                profiles[name][j] = profile
+            corrs[name][j] = np.corrcoef(profile, references[j])[0, 1]
+            sums[name][j] = profile.sum() / references[j].sum()
 
-            else:
-                reference = profiles['AD99'][j]
-                weights = reference / reference.sum()
-
-                error = profile - reference
-                profiles[name][j] = np.average(error, weights=weights)
-
-    fig, ax = plt.subplots()
-    fig.set_size_inches(3, 6)
+    fig, axes = plt.subplots(ncols=2)
+    fig.set_size_inches(6, 6)
 
     y = -np.arange(len(pressures))
     labels = [format_pressure(p) for p in pressures]
-    ax.plot(np.zeros(len(y)), y, color='lightgray', ls='dashed')
 
-    for (name, profile), color in zip(profiles.items(), COLORS):
-        if name == 'AD99':
-            continue
+    for (name, corr), color in zip(corrs.items(), COLORS):
+        axes[0].plot(corr, y, color=color, label=format_name(name))
+        axes[1].plot(sums[name], y, color=color)
 
-        ax.plot(profile, y, color=color, label=name)
+    for ax in axes:
+        ax.set_yticks(y[::3])
+        ax.set_yticklabels(labels[::3])
+        ax.set_ylim(y[-1], y[0])
+    
+    axes[0].set_xlim(0, 1)
+    axes[0].set_xlabel('SHAP correlation')
+    axes[0].set_ylabel('prediction level (hPa)')
+    axes[0].legend(loc='lower center')
 
-    ax.set_xticks(np.linspace(-1, 1, 5))
-    ax.set_xlim(-1, 1)
-
-    ax.set_yticks(y[::3])
-    ax.set_yticklabels(labels[::3])
-    ax.set_ylim(y[-1], y[0])
-
-    ax.set_xlabel('Shapley overshoot')
-    ax.set_ylabel('prediction level (hPa)')
-    ax.legend(loc='lower center')
+    axes[1].set_xlim(0.5, 1.5)
+    axes[1].set_xlabel('SHAP ratio')
 
     plt.tight_layout()
     plt.savefig(output_path)
-
-

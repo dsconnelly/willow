@@ -23,7 +23,7 @@ class WaveNet(nn.Module):
         super().__init__()
 
         shared = [nn.BatchNorm1d(n_in), nn.Linear(n_in, 256), nn.ReLU()]
-        for i in range(4):
+        for _ in range(4):
             shared.append(nn.Linear(256, 256))
             shared.append(nn.ReLU())
 

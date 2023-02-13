@@ -9,7 +9,7 @@ python () {
 data_dir="data/ad99-control"
 control_dir="/scratch/dsc7746/cases/control"
 warm_dir="/scratch/dsc7746/cases/4xco2"
-suffix="s"
+suffix="y"
 
 submit() {
     local model_name=$1
@@ -21,10 +21,10 @@ submit() {
     local shap_cmd="plot-feature-importances ${data_dir} ${model_dir} plots/manuscript/${model_name}-shapley.png"
     sbatch -J ${model_name}-shapley --dependency=afterok:${train_id} willow.slurm ${shap_cmd}
 
-    python -m willow initialize-coupled-run ${control_dir}/ad99 ${model_dir}
+    python -m willow initialize-coupled-run ${control_dir}/ad99 ${model_dir} --n-years 30
     sbatch --dependency=afterok:${train_id} ${control_dir}/${model_name}/submit.slurm
 
-    python -m willow initialize-coupled-run ${warm_dir}/ad99 ${model_dir}
+    python -m willow initialize-coupled-run ${warm_dir}/ad99 ${model_dir} --n-years 30
     sbatch --dependency=afterok:${train_id} ${warm_dir}/${model_name}/submit.slurm
 }
 

@@ -3,7 +3,7 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 
-from ..utils.plotting import format_name, get_rows_and_columns
+from ..utils.plotting import format_name, get_letter, get_rows_and_columns
 from ..utils.ssw import load_ssw
 
 def plot_ssws(case_dirs: list[str], output_path: str) -> None:
@@ -24,7 +24,7 @@ def plot_ssws(case_dirs: list[str], output_path: str) -> None:
     fig.set_size_inches(9 * n_cols, 3 * n_rows)
     axes = axes.flatten()
 
-    for case_dir, ax in zip(case_dirs, axes):
+    for i, (case_dir, ax) in enumerate(zip(case_dirs, axes)):
         u, idx = load_ssw(case_dir)
         year, day = u['time'].dt.year, u['time'].dt.dayofyear
         time = (((year - year[0]) * 360 + day - 1) / 360).values
@@ -57,9 +57,10 @@ def plot_ssws(case_dirs: list[str], output_path: str) -> None:
         ax.set_xlabel('year')
         ax.set_ylabel('$u$ (m s$^{-1}$)')
 
+        letter = get_letter(i)
         name = format_name(os.path.basename(case_dir))
         rate = 10 * len(idx) / (time.max() - time.min())
-        ax.set_title(f'{name} \u2014 {rate:.2f} SSW per decade')
+        ax.set_title(f'({letter}) {name} \u2014 {rate:.2f} SSW per decade')
 
     plt.tight_layout()
     plt.savefig(output_path)

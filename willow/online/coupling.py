@@ -1,6 +1,7 @@
 import os
 import shutil
 
+from textwrap import indent
 from typing import Optional
 
 from ..utils.copying import copy_with_modifications
@@ -150,34 +151,59 @@ def _submit_modifier(
         return line.replace('{01..40}', f'{{01..{n_years:02}}}')
 
     if 'mv RESTART/* INPUT' in line:
-        lines = [
-            line.strip(), '',
-            'cdo --reduce_dim \\',
-            '    -daymean -zonmean \\',
-            '    -selname,u_gwf \\',
-            '    ${yy}/atmos_4xdaily.nc ${yy}/tmp.nc', '',
-            'cdo --reduce_dim -mermean \\',
-            '    -sellonlatbox,0.0,360.0,-5.0,5.0 \\',
-            '    ${yy}/tmp.nc ${yy}/qbo.nc', '',
-            'cdo -mermean \\',
-            '    -sellonlatbox,0.0,360.0,58.0,60.5 \\',
-            '    ${yy}/tmp.nc ${yy}/ssw.nc', '',
-            'rm ${yy}/atmos_4xdaily.nc',
-            'rm ${yy}/tmp.nc'
-        ]
-
-        return ''.join([f'    {s}\n' if s else '\n' for s in lines])
-
-    if 'rm .model.run' in line:
-        lines = [
-            line.strip(), '',
-            'cdo mergetime ??/qbo.nc qbo.nc',
-            'cdo mergetime ??/ssw.nc ssw.nc',
-            f'for yy in {{01..{n_years:02}}}; do',
-            '    rm -rf ${yy}',
-            'done'
-        ]
+        lines = ['    ' + line.strip(), indent(_PARSE, '    ')]
 
         return ''.join([s + '\n' for s in lines])
 
+    if 'rm .model.run' in line:
+        return '\n'.join([line.strip(), _MERGE.format(n_years=n_years)])
+
     return line
+
+_PARSE = r"""
+cdo --reduce_dim -mermean -daymean -zonmean \
+    -sellonlatbox,0.0,360.0,-5.0,5.0 -selname,u_gwf \
+    ${yy}/atmos_4xdaily.nc ${yy}/qbo.nc
+
+cdo -mermean -daymean -zonmean \
+    -sellonlatbox,0.0,360.0,59.0,61.0 -selname,u_gwf \
+    ${yy}/atmos_4xdaily.nc ${yy}/ssw.nc
+
+cdo --reduce_dim -timmean -zonmean \
+    -selname,u_gwf,v_gwf,t_gwf,gwfu_cgwd,gwfv_cgwd \
+    ${yy}/atmos_4xdaily.nc ${yy}/clim.nc
+
+cdo -sellonlatbox,0.0,360.0,1.0,2.0 \
+    -selname,u_gwf,t_gwf \
+    ${yy}/atmos_4xdaily.nc ${yy}/tropical.nc
+
+cdo -sellonlatbox,0.0,360.0,39.0,41.0 \
+    -selname,u_gwf,t_gwf \
+    ${yy}/atmos_4xdaily.nc ${yy}/midlatitude.nc
+
+cdo -sellonlatbox,0.0,360.0,59.0,61.0 \
+    -selname,u_gwf,t_gwf \
+    ${yy}/atmos_4xdaily.nc ${yy}/polar.nc
+
+rm ${yy}/atmos_4xdaily.nc
+"""
+
+_MERGE = """
+cdo mergetime ??/qbo.nc qbo.nc
+cdo mergetime ??/ssw.nc ssw.nc
+cdo timmean -mergetime ??/clim.nc clim.nc
+
+cdo mergetime ??/tropical.nc tropical.nc
+cdo mergetime ??/midlatitude.nc midlatitude.nc
+cdo mergetime ??/polar.nc polar.nc
+cdo collgrid tropical.nc midlatitude.nc polar.nc covariance.nc
+
+rm ??/qbo.nc ??/ssw.nc ??/clim.nc
+rm ??/tropical.nc tropical.nc
+rm ??/midlatitude.nc midlatitude.nc
+rm ??/polar.nc polar.nc
+
+for yy in {{01..{n_years}}}; do
+    rm -rf ${{yy}}
+done
+"""
