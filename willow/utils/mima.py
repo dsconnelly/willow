@@ -2,6 +2,8 @@ import os
 
 from typing import Optional
 
+import dask
+import numpy as np
 import xarray as xr
 
 from cftime import num2date
@@ -57,7 +59,11 @@ def open_mima_output(
     ds['time'] = num2date(ds['time'].values, _UNITS, _CALENDAR)
 
     time = ds['time'].values
+    years = np.array([t.year for t in time])
+
     n_available = round((time[-1] - time[0]).days / 360) - 3
     n_years = min(n_years, n_available) if n_years else n_available
+    start = years[-1] - n_years
 
-    return ds.isel(time=slice(-(360 * n_years), None))
+    with dask.config.set(**{'array.slicing.split_large_chunks' : False}):
+        return ds.isel(time=(years >= start))

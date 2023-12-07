@@ -12,7 +12,8 @@ def load_datasets(
     data_dir: str,
     suffix: str,
     n_samples: Optional[int]=None,
-    component: str='both'
+    component: str='both',
+    seed: Optional[int]=None
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     Load features and targets as `DataFrame`s, with optional subsampling.
@@ -27,6 +28,7 @@ def load_datasets(
     component : If `'both'`, the `DataFrame` is sampled without regard to
         whether zonal or meridional drag is being predicted. If `'u'` or `'v'`,
         only samples from the respective direction are taken.
+    seed : Integer to use as seed for subsampling, for reproducibility.
 
     Returns
     -------
@@ -53,8 +55,9 @@ def load_datasets(
             raise ValueError(f'Unknown component {component}')
 
     if n_samples is not None:
+        rng = np.random.default_rng(seed)
         n_samples = min(n_samples, len(X))
-        idx = np.random.choice(len(X), size=n_samples, replace=False)
+        idx = rng.choice(len(X), size=n_samples, replace=False)
         X, Y = X.iloc[idx], Y.iloc[idx]
 
     return X, Y

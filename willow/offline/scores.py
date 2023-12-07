@@ -44,21 +44,24 @@ def plot_R2_scores(
     axes = _make_axes(fig, pressures)
     fig.set_size_inches(9, 6)
 
+    z = 10 + len(model_dirs)
     for model_dir, color in zip(model_dirs, COLORS):
         path = os.path.join(model_dir, 'model.pkl')
         model: MiMAModel = joblib.load(path)
         name = format_name(model.name)
 
         by_lev, by_lat = _get_scores(X_tr, Y_tr, model)
-        axes[0].plot(by_lev, y, color=color)
-        axes[1].plot(lats, by_lat, color=color, label=name)
+        axes[0].plot(by_lev, y, color=color, ls='dashed', zorder=z)
+        axes[1].plot(lats, by_lat, color=color, ls='dashed', zorder=z)
 
         by_lev, by_lat = _get_scores(X_te, Y_te, model)
-        axes[0].plot(by_lev, y, color=color, ls='dashed')
-        axes[1].plot(lats, by_lat, color=color, ls='dashed')
+        axes[0].plot(by_lev, y, color=color, zorder=z)
+        axes[1].plot(lats, by_lat, color=color, label=name, zorder=z)
 
-    axes[1].plot([], [], color='gray', label='training')
-    axes[1].plot([], [], color='gray', ls='dashed', label='test')
+        z = z - 1
+
+    axes[1].plot([], [], color='gray', ls='dashed', label='training')
+    axes[1].plot([], [], color='gray', label='test')
     axes[1].legend()
 
     plt.savefig(output_path)

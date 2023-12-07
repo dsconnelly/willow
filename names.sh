@@ -7,9 +7,14 @@ model_names=(
     mubofo-wind-shear
     mubofo-shear-T
 
-    mubofo-wind-T-repeat1
-    mubofo-wind-T-repeat2
-    mubofo-wind-T-repeat3
+    # mubofo-wind-T-repeat1
+    # mubofo-wind-T-repeat2
+    # mubofo-wind-T-repeat3
+
+    # mubofo-wind-T-lat_scale_0.01
+    # mubofo-wind-T-lat_scale_0.85
+    mubofo-wind-T-lat_scale_1.55
+    # mubofo-wind-T-lat_scale_2.05
 
     random-wind-T
     random-wind-shear
@@ -18,9 +23,9 @@ model_names=(
     WaveNet-wind-T
     WaveNet-wind-noloc
 
-    WaveNet-wind-T-repeat1
-    WaveNet-wind-T-repeat2
-    WaveNet-wind-T-repeat3
+    # WaveNet-wind-T-repeat1
+    # WaveNet-wind-T-repeat2
+    # WaveNet-wind-T-repeat3
 )
 
 prefix=$1

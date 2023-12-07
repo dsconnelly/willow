@@ -50,17 +50,32 @@ def format_name(name: str, simple=False) -> str:
 
     """
 
-    if 'ad99' in name:
-        return 'AD99'
+    co2 = None
+    if '/' in name:
+        *_, co2, name = name.split('/')
 
     kind, *name_parts = name.split('-')
     kind = {
+        'ad99' : 'AD99',
         'mubofo' : 'boosted forest',
         'random' : 'random forest',
         'WaveNet' : 'neural network'
     }[kind]
 
-    if simple:
+    if 'lat_scale' in name:
+        part = [x for x in name_parts if x.startswith('lat_scale')][0]
+        *_, s = part.split('_')
+
+        if co2 is not None:
+            return f'retrained {kind} ({co2} ppm CO$_2$)'
+
+        return f'retrained\n{kind}'
+        # return f'{kind} (s = {s})'
+
+    if co2 is not None:
+        return f'{kind} ({co2} ppm CO$_2$)'
+
+    if simple or 'AD99' in kind:
         return kind
 
     features = [s for s in name_parts if s in ['wind', 'shear', 'N', 'T']]

@@ -74,6 +74,7 @@ def _override_parameters(model_name: str, kwargs: dict[str, Any]) -> None:
         *name_parts, value = override.split('_')
         name = '_'.join(name_parts)
 
-        caster = type(kwargs[name])
-        kwargs[name] = caster(value)
-        logging.info(f'Setting {name} to {value}.')
+        if name in kwargs:
+            caster = type(kwargs[name])
+            kwargs[name] = caster(value)
+            logging.info(f'Setting {name} to {value}.')

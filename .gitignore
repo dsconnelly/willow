@@ -1,8 +1,10 @@
 *.ipynb_checkpoints*
 .vscode/*
 data/*
+misc/*
 models/*
 old-code/*
+old-plots/*
 plots/*
 *__pycache__*
 slurm.out

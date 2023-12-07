@@ -1,4 +1,4 @@
-from typing import Any, Literal, Optional, Union, cast, overload
+from typing import Any, Callable, Literal, Optional, Union, cast, overload
 
 import numpy as np
 
@@ -93,13 +93,14 @@ def standardize(
 
     return output, means, stds
 
-def std_with_error(
+def stat_with_error(
     a: np.ndarray,
     confidence: float=0.95,
-    n_resamples: int=int(1e4)
+    n_resamples: int=int(1e4),
+    stat_func: Optional[Callable[[np.ndarray], float]]=None
 ) -> tuple[float, float]:
     """
-    Calculate standard deviation with boostrapped error estimates.
+    Calculate a statistic with boostrapped error estimates.
 
     Parameters
     ----------
@@ -107,20 +108,25 @@ def std_with_error(
     confidence : Width of error bars. For example, `confidence=0.95` returns
         an error bar containing at least 95% of the bootstrapped statistics.
     n_resamples : Number of bootstrapped subsamples to use.
+    stat_func : Function that computes the statistic of interest. If `None`, the
+        standard deviation will be used.
 
     Returns
     -------
-    std : Estimated standard deviation.
+    stat : Estimated statistic.
     error : One-sided error bar.
 
     """
 
-    stds = np.zeros(n_resamples)
+    if stat_func is None:
+        stat_func = np.std
+
+    stats = np.zeros(n_resamples)
     for i in range(n_resamples):
-        stds[i] = np.std(np.random.choice(a, size=a.shape[0]))
+        stats[i] = stat_func(np.random.choice(a, size=a.shape[0]))
 
-    std = np.std(a)
+    stat = stat_func(a)
     m = int(n_resamples * (1 - confidence) / 2)
-    left, *_, right = abs(np.sort(stds)[m:(-m)] - std)
+    left, *_, right = abs(np.sort(stats)[m:(-m)] - stat)
 
-    return std, max(left, right)
+    return stat, max(left, right)

@@ -8,7 +8,7 @@ import scipy.signal as signal
 import xarray as xr
 
 from ..utils.mima import open_mima_output
-from ..utils.statistics import std_with_error
+from ..utils.statistics import stat_with_error
 
 def get_qbo_statistics(u: xr.DataArray) -> tuple[float, float, float, float]:
     """
@@ -50,9 +50,12 @@ def load_qbo(case_dir: str) -> xr.DataArray:
 
     """
 
-    path = os.path.join(case_dir, 'qbo.nc')
-    with open_mima_output(path, n_years=24) as ds:
-        u = ds['u_gwf'].sel(pfull=slice(None, 115))
+    path = os.path.join(case_dir, 'zonal_mean.nc')
+    with open_mima_output(path, n_years=56) as ds:
+        u = ds['u_gwf'].sel(
+            pfull=slice(None, 115),
+            lat=slice(-5, 5)
+        ).mean(('lat', 'lon'))
 
     return u.load()
 
@@ -97,7 +100,7 @@ def _get_qbo_amplitude(u: xr.DataArray, level: float=10) -> tuple[float, float]:
 
     """
 
-    return std_with_error(u.sel(pfull=level, method='nearest').values)
+    return stat_with_error(u.sel(pfull=level, method='nearest').values)
 
 def _get_qbo_period(
     u: xr.DataArray,

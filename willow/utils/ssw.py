@@ -7,8 +7,11 @@ import numpy as np
 import xarray as xr
 
 from .mima import open_mima_output
+from .statistics import stat_with_error
 
-def load_ssw(case_dir: str) -> tuple[xr.DataArray, np.ndarray]:
+_N_YEARS = 40
+
+def load_ssw(case_dir: str) -> xr.DataArray:
     """
     Load the SSW wind and count the number of warmings from a MiMA run.
 
@@ -19,18 +22,34 @@ def load_ssw(case_dir: str) -> tuple[xr.DataArray, np.ndarray]:
     Returns
     -------
     u : DataArray of SSW (10 hPa at 60N) daily mean winds.
-    idx : Integer indices of starts of warming events.
 
     """
 
-    path = os.path.join(case_dir, 'ssw.nc')
-    with open_mima_output(path, n_years=24) as ds:
+    path = os.path.join(case_dir, 'zonal_mean.nc')
+    with open_mima_output(path, n_years=_N_YEARS) as ds:
         with warnings.catch_warnings():
             warnings.simplefilter('ignore', FutureWarning)
 
-            u = ds['u_gwf'].isel(lat=0, lon=0)
+            u = ds['u_gwf'].sel(lat=60, method='nearest').isel(lon=0)
             u = u.sel(pfull=10, method='nearest')
             u = u.resample(time='1D').mean(('time')).load()
+
+    return u
+
+def get_ssw_frequency(u: xr.DataArray) -> tuple[float, float]:
+    """
+    Get the SSW frequency along with the bootstrapped uncertainty.
+
+    Parameters
+    ----------
+    u : DataArray of SSW (10 hPa at 60N) daily mean winds.
+
+    Returns
+    -------
+    freq : SSW frequency per decade.
+    error : Bootstrapped uncertainty.
+
+    """
 
     idx: list[int] = []
     count: Optional[int] = None
@@ -59,6 +78,19 @@ def load_ssw(case_dir: str) -> tuple[xr.DataArray, np.ndarray]:
         else:
             count = 0
 
-    return u, np.array(idx)
+    winters = np.zeros(_N_YEARS + 1)
+    start = u.time[0].item().year
 
-    
+    for i in idx:
+        time = u.time[i].item()
+        year = time.year - start
+
+        if time.month > 10:
+            year = year + 1
+
+        winters[year] += 1
+
+    def stat_func(a):
+        return 10 * a.sum() / len(a)
+
+    return stat_with_error(winters, stat_func=stat_func)

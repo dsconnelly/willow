@@ -11,7 +11,7 @@ from ..utils.plotting import format_pressure
 def save_datasets(
     case_dir: str,
     output_dir: str,
-    n_samples: int=int(1e5)
+    n_samples: int=int(1e7)
 ) -> None:
     """
     Read MiMA output files and save training and test sets.

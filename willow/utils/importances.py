@@ -2,7 +2,6 @@ import logging
 import warnings
 
 from collections import defaultdict
-from typing import Optional
 
 import numpy as np
 import torch
@@ -79,8 +78,9 @@ def get_shapley_values(
 
     if isinstance(model, AlexanderDunkerton):
         Y = model.predict(background)
-        means, stds = Y.mean(axis=0), Y.std(axis=0)
+        _, means, stds = standardize(Y)
         f = lambda Z: standardize(model.predict(Z), means, stds)[0]
+        predictions = f(X)
 
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', category=FutureWarning)
@@ -88,25 +88,42 @@ def get_shapley_values(
             
             background = kmeans(background, 100)
             explainer = KernelExplainer(f, background)
+
             importances = np.stack(explainer.shap_values(X, l1_reg=0))
+            expectations = explainer.expected_value
 
     elif isinstance(model, (MultioutputBoostedForest, MultioutputRandomForest)):
-        _importances = []
-        for i, estimator in enumerate(model.estimators_):
-            explainer = TreeExplainer(estimator)
-            _importances.append(np.stack(explainer.shap_values(X)))
-            logging.info(f'Computed Shapley values for tree {i + 1}.')
+        background = kmeans(background, 100).data
+        explainer = KernelExplainer(model.predict, background)
 
-        importances = sum(_importances)
-        if isinstance(model, MultioutputBoostedForest):
-            importances *= model.learning_rate
-        elif isinstance(model, MultioutputRandomForest):
-            importances /= len(model.estimators_)
+        importances = np.stack(explainer.shap_values(X, nsamples=5000))
+        expectations = explainer.expected_value
+        predictions = model.predict(X)
+
+        if model.n_outputs_ > 40:
+            importances = importances[:40]
+            expectations = expectations[:40]
+            predictions = predictions[:, :40]
         
     elif isinstance(model, torch.nn.Module):
         background = kmeans(background, 100).data
-        explainer = DeepExplainer(model, torch.tensor(background))
-        importances = np.stack(explainer.shap_values(torch.tensor(X)))
+    
+        def f(Z):
+            if not isinstance(Z, torch.Tensor):
+                Z = torch.tensor(Z)
+
+            with torch.no_grad():
+                return model(Z).numpy()
+
+        explainer = KernelExplainer(f, background)
+        X_tensor = X
+
+        importances = np.stack(explainer.shap_values(X_tensor))
+        expectations = explainer.expected_value
+
+        with torch.no_grad():
+            # predictions = model(X_tensor).numpy()
+            predictions = f(X_tensor)
 
     samples = np.arange(X.shape[0]) + 1
     importances = importances.transpose(1, 2, 0)
@@ -114,7 +131,9 @@ def get_shapley_values(
 
     data = {
         'importances' : (('sample', 'feature', 'pressure'), importances),
-        'X' : (('sample', 'feature'), X)
+        'expectations' : (('pressure',), expectations),
+        'X' : (('sample', 'feature'), X),
+        'predictions' : (('sample', 'pressure'), predictions)
     }
 
     return xr.Dataset(data, coords)

@@ -13,7 +13,7 @@ class MiMAModel:
         model: Model,
         means: np.ndarray,
         stds: np.ndarray,
-        col_idx: np.ndarray
+        col_idx: np.ndarray,
     ) -> None:
         """
         Initialize a MiMAModel.
@@ -60,7 +60,11 @@ class MiMAModel:
             with torch.no_grad():
                 return self.model(torch.tensor(X)).double().numpy()
 
-        return self.model.predict(X).astype(np.double)
+        Y = self.model.predict(X).astype(np.double)
+        if Y.shape[1] > 40:
+            Y = Y[:, :-1]
+
+        return Y
 
     def predict(self, X: Dataset) -> np.ndarray:
         """
