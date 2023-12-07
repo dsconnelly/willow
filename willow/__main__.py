@@ -14,7 +14,6 @@ from .offline import (
 from .online import (
     initialize_coupled_run,
     plot_biases,
-    plot_distribution_shift,
     plot_qbos,
     plot_qbo_statistics,
     plot_ssw_frequencies
@@ -46,5 +45,4 @@ if __name__ == '__main__':
         plot_qbos,
         plot_qbo_statistics,
         plot_ssw_frequencies,
-        plot_distribution_shift
     ]).run()
