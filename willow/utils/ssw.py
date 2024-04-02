@@ -9,7 +9,7 @@ import xarray as xr
 from .mima import open_mima_output
 from .statistics import stat_with_error
 
-_N_YEARS = 40
+_N_YEARS = 56
 
 def load_ssw(case_dir: str) -> xr.DataArray:
     """

@@ -13,6 +13,7 @@ def load_datasets(
     suffix: str,
     n_samples: Optional[int]=None,
     component: str='both',
+    phase: Optional[str]=None,
     seed: Optional[int]=None
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
@@ -28,6 +29,8 @@ def load_datasets(
     component : If `'both'`, the `DataFrame` is sampled without regard to
         whether zonal or meridional drag is being predicted. If `'u'` or `'v'`,
         only samples from the respective direction are taken.
+    phase : If 'west' or 'east', only samples from the corresponding QBO phase
+        are returned. If None, all samples are possible.
     seed : Integer to use as seed for subsampling, for reproducibility.
 
     Returns
@@ -41,6 +44,17 @@ def load_datasets(
 
     X: pd.DataFrame = pd.read_pickle(os.path.join(data_dir, f'X-{suffix}.pkl'))
     Y: pd.DataFrame = pd.read_pickle(os.path.join(data_dir, f'Y-{suffix}.pkl'))
+
+    if phase is not None:
+        u_qbo = X['wind @ 11 hPa'].values
+
+        if phase == 'west':
+            idx = u_qbo > 10
+        elif phase == 'east':
+            idx = u_qbo < -5
+
+        X = X.iloc[idx]
+        Y = Y.iloc[idx]
 
     if component != 'both':
         m = len(X) // 2

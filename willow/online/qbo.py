@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from matplotlib.axes import Axes
+from matplotlib.colors import SymLogNorm, Normalize
 from matplotlib.gridspec import GridSpec
 
 from ..utils.plotting import (
@@ -22,7 +23,11 @@ _CBAR_SCALE = 0.15
 _CMAP = 'RdBu_r'
 _VMAX = 75
 
-def plot_qbos(case_dirs: list[str], output_path: str,) -> None:
+def plot_qbos(
+    case_dirs: list[str],
+    output_path: str,
+    plot_drag: bool=False
+) -> None:
     """
     Plot quasi-biennial oscillations from one or more MiMA runs.
 
@@ -30,12 +35,14 @@ def plot_qbos(case_dirs: list[str], output_path: str,) -> None:
     ----------
     case_dirs : Directories of the MiMA runs with QBOs to be plotted.
     output_path : Path where the plot should be saved.
+    plot_drag : Whether to plot the drag instead of the wind.
 
     """
 
     n_subplots = len(case_dirs)
     # n_rows, n_cols = get_rows_and_columns(n_subplots)
-    n_rows, n_cols = n_subplots // 3, 3
+    # n_rows, n_cols = n_subplots // 3, 3
+    n_rows, n_cols = 4, 3
 
     fig = plt.figure(constrained_layout=True)
     fig.set_size_inches(5 * n_cols, 2.5 * (n_rows + _CBAR_SCALE))
@@ -48,23 +55,43 @@ def plot_qbos(case_dirs: list[str], output_path: str,) -> None:
             if len(axes) < n_subplots:
                 axes.append(fig.add_subplot(gs[i, j]))
 
-    levels = np.linspace(-_VMAX, _VMAX, 13)
+    if plot_drag:
+        var = 'gwfu_cgwd'
+        vmax = 20
+        norm = SymLogNorm(
+            linthresh=1e-3 * vmax,
+            vmin=-vmax,
+            vmax=vmax
+        )
+
+        levels = np.array([0.005, 0.01, 0.05, 0.1, 0.5, 1]) * vmax
+        levels = np.concatenate((-np.flip(levels), np.array([0]), levels))
+        label = 'zonal mean tropical zonal GWD (m s$^{-1}$ day$^{-1}$)'
+
+    else:
+        var = 'u_gwf'
+        norm = Normalize(-_VMAX, _VMAX)
+        levels = np.linspace(-_VMAX, _VMAX, 13)
+        label = 'zonal mean tropical $u$ (m s$^{-1}$)'
+        
     for i, (case_dir, ax) in enumerate(zip(case_dirs, axes)):
-        u = load_qbo(case_dir)
+        u = load_qbo(case_dir, var)
         time = u['time'].values
         
-        years = np.array([x.days for x in time - time[0]]) / 360
-        start = (years >= years[-1] - 36).argmax()
-        u = u.isel(time=slice(start, None))
-        years = years[start:]
+        # years = np.array([x.days for x in time - time[0]]) / 360
+        years = time / 360
+        # start = (years >= years[-1] - 12).argmax()
+        slice = (years - years[0]) >= 6
+        slice = slice & ((years - years[0]) < 18)
+        u = u.isel(time=slice)
+        years = years[slice]
 
         pressures = [format_pressure(p) for p in u.pfull.values]
         ys = -np.arange(len(pressures))
 
         img = ax.contourf(
             years, ys, u.T,
-            vmin=-_VMAX,
-            vmax=_VMAX,
+            norm=norm,
             cmap=_CMAP,
             levels=levels,
             extend='both'
@@ -87,8 +114,8 @@ def plot_qbos(case_dirs: list[str], output_path: str,) -> None:
 
     cax = fig.add_subplot(gs[-1, :])
     cbar = plt.colorbar(img, cax=cax, orientation='horizontal')
-    cbar.set_label('zonal mean tropical $u$ (m s$^{-1}$)')
     cbar.set_ticks(levels[::2])
+    cbar.set_label(label)
 
     plt.savefig(output_path)
 
@@ -132,22 +159,37 @@ def plot_qbo_statistics(case_dirs: list[str], output_path: str) -> None:
     n_models = len(periods)
     width = 1 / (n_models + 1)
 
+    handles = []
+    labels = []
+
     for i, name in enumerate(periods.keys()):
         color = cmap.get(name, 'gray')
         label = format_name(name, simple=True)
         xs = (i - 1) * width - (width / 2 if n_models % 2 == 0 else 0)
 
-        axes[0].bar(
+        hatch = None
+        edgecolor='k'
+
+        if 'lat_scale' in name:
+            edgecolor = 'tab:red'
+            color = 'white'
+            hatch = '//'
+
+        handle, *_ = axes[0].bar(
             ticks + xs,
             periods[name],
             yerr=period_errs[name],
             capsize=8,
             width=width,
-            color=color,
-            edgecolor='k',
+            facecolor=color,
+            edgecolor=edgecolor,
             ecolor='k',
+            hatch=hatch,
             label=label
         )
+
+        handles.append(handle)
+        labels.append(label)
 
         axes[1].bar(
             ticks + xs,
@@ -155,10 +197,32 @@ def plot_qbo_statistics(case_dirs: list[str], output_path: str) -> None:
             yerr=amp_errs[name],
             capsize=8,
             width=width,
-            color=color,
-            edgecolor='k',
+            facecolor=color,
+            edgecolor=edgecolor,
             ecolor='k',
+            hatch=hatch
         )
+
+        if 'lat_scale' in name:
+            handle, *_ = axes[0].bar(
+                ticks + xs,
+                periods[name],
+                width=width,
+                color='none',
+                edgecolor='k',
+                ecolor='k'
+            )
+
+            handles[-1] = (handles[-1], handle)
+
+            axes[1].bar(
+                ticks + xs,
+                amps[name],
+                width=width,
+                color='none',
+                edgecolor='k',
+                ecolor='k',
+            )
 
     for ax in axes:
         ax.set_xticks(ticks)
@@ -176,11 +240,12 @@ def plot_qbo_statistics(case_dirs: list[str], output_path: str) -> None:
 
     axes[0].set_title('(a) QBO period')
     axes[1].set_title('(b) QBO amplitude')
-    axes[0].legend()
+    axes[0].legend(handles, labels)
 
-    # axes[0].set_ylim(20, 60)
-    axes[0].set_ylim(20, 45)
-    axes[1].set_ylim(10, 25)
+    axes[0].set_ylim(20, 60)
+    # axes[0].set_ylim(20, 45)
+    axes[1].set_ylim(13, 25)
+    axes[1].set_yticks([13, 16, 19, 22, 25])
 
     plt.tight_layout()
     plt.savefig(output_path)

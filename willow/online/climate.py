@@ -8,9 +8,11 @@ from matplotlib.axes import Axes
 from matplotlib.cm import ScalarMappable
 from matplotlib.colors import Normalize
 from matplotlib.gridspec import GridSpec
+from scipy.integrate import cumulative_trapezoid as integrate
 from scipy.stats import ttest_ind as ttest
+from sklearn.decomposition import PCA
 
-from ..utils.mima import open_mima_output
+from ..utils.mima import get_paths, open_mima_output
 from ..utils.plotting import (
     COLORS,
     format_latitude, 
@@ -168,3 +170,204 @@ def plot_distribution_shift(
 
     plt.tight_layout()
     plt.savefig(output_path)
+
+def plot_tropical_analysis(
+    case_dirs: list[str],
+    output_path: str,
+    recalculate: bool=True,
+    ref_dirs: list[str]=None
+) -> None:
+    """
+    Make various latitude/height cross sections for the paper revisions.
+
+    Parameters
+    ----------
+    case_dirs : Directories where MiMA was run.
+    output_path : Where to save the image.
+    recalculate : Whether to recalculate the data fields.
+    ref_dirs : Directories to show difference in w_star
+
+    """
+
+    if recalculate:
+        for case_dir in case_dirs:    
+            paths = get_paths(case_dir)
+            with open_mima_output(paths, 16) as ds:
+            # with open_mima_output(f'{case_dir}/zonal_mean.nc') as ds:
+                ds = ds.sel(lat=slice(-20, 20))
+                ds['lat'] = np.deg2rad(ds['lat'])
+                ds['pfull'] = 100 * ds['pfull']
+
+                w_star = 1000 * _get_w_star(ds)
+                gwfu = 86400 * ds['gwfu_cgwd'].mean('lon')
+                u = ds['u_gwf'].mean('lon')
+
+                xr.Dataset({
+                    'w_star' : w_star,
+                    'gwfu' : gwfu,
+                    'u' : u
+                }).to_netcdf(f'{case_dir}/long-means/revisions.nc')
+
+    colors = ['k'] + [c for c, case_dir in zip(COLORS, case_dirs[1:])]
+    fig, axes = plt.subplots(ncols=3)
+    fig.set_size_inches(12, 6)
+
+    tcolor = 'goldenrod'
+    taxes = [ax.twiny() for ax in axes]
+    
+    for i, (case_dir, color) in enumerate(zip(case_dirs, colors)):
+        with xr.open_dataset(f'{case_dir}/revisions.nc') as ds:
+            ds = ds.sel(pfull=slice(None, 30000), lat=slice(-5, 5))
+            u_qbo = ds['u'].sel(pfull=1000, method='nearest').mean('lat').values
+
+            pressures = ds['pfull'].values / 100
+            labels = [format_pressure(p) for p in pressures]
+            y = -np.arange(len(pressures))
+
+            idx_west = u_qbo > 10
+            idx_east = u_qbo < -5
+
+            for idx, ax, tax in zip([idx_west, idx_east], axes[1:], taxes[1:]):
+                if i == 0:
+                    u = ds['u'].isel(time=idx).mean(('time', 'lat'))
+                    tax.plot(u, y, color=tcolor, ls='dashed')
+
+                    tax.set_zorder(5)
+                    ax.set_zorder(10)
+                    ax.patch.set_visible(False)
+
+                gwf = ds['gwfu'].isel(time=idx).mean(('time', 'lat'))
+                ax.plot(gwf, y, color=color)
+
+            if ref_dirs is not None:
+                ref_dir = ref_dirs[i]
+                with xr.open_dataset(f'{ref_dir}/revisions.nc') as rds:
+                    rds = rds.sel(pfull=slice(None, 30000), lat=slice(-5, 5))
+                    ref_w = rds['w_star'].mean(('time', 'lat'))
+
+            label = format_name(case_dir, True)
+            label = label[:label.index(' (')]
+
+            # axes[0].plot([], [], color=color, label=label)
+            w_star = ds['w_star'].mean(('time', 'lat'))
+            if ref_dirs is not None:
+                w_star = w_star - ref_w
+
+            axes[0].plot(w_star, y, color=color, label=label)
+
+    for ax in axes[1:]:
+        ax.set_xlim(-3, 3)
+        
+    axes[1].set_xlabel('QBOW drag (m s$^{-1}$ day$^{-1}$)')
+    axes[2].set_xlabel('QBOE drag (m s$^{-1}$ day$^{-1}$)')
+
+    for i, tax in enumerate(taxes):
+        tax.set_xlim(-30, 30)
+        tax.set_xlabel('$\\bar{u}$ (m s$^{-1}$)')
+        tax.grid(False)
+
+        tax.xaxis.label.set_color('w' if i == 0 else tcolor)
+        tax.spines['top'].set_edgecolor('k' if i == 0 else tcolor)
+        tax.tick_params(axis='x', colors='w' if i == 0 else tcolor)
+
+    # axes[0].set_xlim(0, 3)
+    if ref_dirs is None:
+        label = '$\\bar{w}^\\ast$ (mm s$^{-1}$)'
+    else:
+        label = '$\\Delta\\bar{w}^\\ast$ (mm s$^{-1}$)'
+
+    axes[0].set_xlabel(label)
+
+    for i, ax in enumerate(axes):
+        ax.set_yticks(y[::3])
+        ax.set_ylim(y[-1], y[0])
+        ax.set_yticklabels(labels[::3])
+        ax.set_ylabel('pressure (hPa)')
+
+        # pad = 30 if i == 0 else 2
+        ax.set_title(f'({get_letter(i)})')
+
+    axes[0].legend()
+    plt.tight_layout()
+    plt.savefig(output_path)
+
+def _get_w_star(ds: xr.Dataset) -> xr.DataArray:
+    a_earth = 6.37e6
+    p_ref = 100000
+
+    v_bar, v_prime = _decompose(ds['v_gwf'])
+    theta = ds['t_gwf'] * ((p_ref / ds['pfull']) ** (2 / 7))
+    theta_bar, theta_prime = _decompose(theta)
+
+    strat = theta_bar.differentiate('pfull')
+    flux = (v_prime * theta_prime).mean('lon')
+    v_star = v_bar - (flux / strat).differentiate('pfull')
+
+    cos_lat = np.cos(ds['lat'])
+    R = a_earth * cos_lat
+
+    rhs = -(v_star * cos_lat).differentiate('lat') / R
+    omega_star = integrate(rhs, rhs['pfull'], axis=1, initial=0)
+    omega_star = omega_star * xr.ones_like(v_star)
+
+    rho = (ds['pfull'] / 287.05 / ds['t_gwf']).mean('lon')
+    return -omega_star / rho / 9.8
+
+def _decompose(data: xr.DataArray) -> tuple[xr.DataArray, xr.DataArray]:
+    data_bar = data.mean('lon')
+    data_prime = data - data_bar
+
+    return data_bar, data_prime
+
+def plot_pca_shift(
+    case_dirs: list[str],
+    output_path: str,
+    field: str,
+    n_samples: int=int(1e6)
+) -> None:
+    """
+    Plot shift in zonal wind or temperature with PCA.
+
+    Parameters
+    ----------
+    case_dirs : Directories where MiMA was run.
+    output_path : Where to save the image.
+    field : Either u or t, depending on what should be plotted.
+    n_samples : How many samples to plot.
+
+    """
+
+    fig, ax = plt.subplots()
+    fig.set_size_inches(6, 6)
+
+    for i, (case_dir, color) in enumerate(zip(case_dirs, COLORS)):
+        with open_mima_output(get_paths(case_dir), 15) as ds:
+            ds = ds.sel(lat=slice(-5, 5))
+            
+            vname = f'{field.lower()}_gwf'
+            u = ds[vname].values.transpose(0, 2, 3, 1).reshape(-1, 40)
+            idx = np.random.permutation(u.shape[0])
+            u = u[idx[:n_samples]]
+
+        if i == 0: pca = PCA(n_components=2).fit(u)
+        x, y = pca.transform(u).T
+
+        label = format_name(case_dir, True)
+        label = label[label.index('(') + 1:-1]
+        ax.scatter(x, y, s=5, color=color, alpha=0.15, linewidth=0, zorder=10)
+        ax.scatter([], [], color=color, label=label)
+
+        ax.set_xlabel('PC1')
+        ax.set_ylabel('PC2')
+
+    amax = {'u' : 150, 'T' : 50}[field]
+    ax.set_xlim(-amax, amax)
+    ax.set_ylim(-amax, amax)
+
+    ax.set_title(f'tropical ${field}$ samples')
+    ax.legend()
+
+    plt.tight_layout()
+    plt.savefig(output_path)
+            
+        

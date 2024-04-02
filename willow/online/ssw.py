@@ -62,7 +62,7 @@ def plot_ssw_frequencies(case_dirs: list[str], output_path: str) -> None:
     ax.set_xticklabels(ppms)
 
     ax.set_xlim(-0.5, len(ppms) - 0.5)
-    ax.set_ylim(0, 14)
+    ax.set_ylim(0, 12)
 
     ax.set_xlabel('CO$_2$ concentration (ppm)')
     ax.set_ylabel('SSW frequency (decade$^{-1}$)')

@@ -1,5 +1,6 @@
 import os
 
+import dask
 import joblib
 import matplotlib.pyplot as plt
 import numpy as np
@@ -9,10 +10,93 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.gridspec import GridSpec
 
+from sklearn.decomposition import PCA
+
+from ..preprocessing.mima import _sample_dataset
+from ..utils.ad99 import AlexanderDunkerton
 from ..utils.datasets import load_datasets
+from ..utils.mima import get_paths, open_mima_output
 from ..utils.plotting import COLORS, format_latitude, format_name
-from ..utils.statistics import R2_score
+from ..utils.statistics import R2_score, standardize
 from ..utils.wrappers import MiMAModel
+
+def plot_emulator_drift(
+    data_dir: str,
+    case_dirs: list[str],
+    output_path: str,
+    n_samples: int=int(1e6)
+) -> None:
+    """
+    Do a PCA analysis to show if emulators respect training bounds.
+
+    Parameters
+    ----------
+    data_dir : Directory containing training and test datasets.
+    case_dirs : Directories containing MiMA runs.
+    output_path : Path where the plot should be saved.
+    n_samples : How many samples to search for extreme errors.
+
+    """
+
+    X, Y_df = load_datasets(data_dir, 'te', component='u')
+    keep = (abs(X['latitude']) <= 5).values
+    X, Y_df = X.iloc[keep], Y_df.iloc[keep]
+    Y = Y_df.to_numpy()
+
+    case_dirs = case_dirs[1:]
+    n_subplots = len(case_dirs)
+    fig, axes = plt.subplots(ncols=n_subplots)
+    fig.set_size_inches(4.5 * n_subplots, 4.5)
+
+    Y_std, means, stds = standardize(Y)
+    pca = PCA(n_components=2).fit(Y_std)
+    x, y = pca.transform(Y_std).T
+
+    amax = 8
+    ticks = np.linspace(-amax, amax, 5)
+    range = ((-amax, amax), (-amax, amax))
+    h_ref, x_edges, y_edges = np.histogram2d(x, y, bins=64, range=range)
+
+    values = h_ref.flatten()
+    idx = np.argsort(values)
+    shade = (np.cumsum(values[idx][::-1]) < 0.95 * values.sum())[::-1]
+    shade = shade[np.argsort(idx)].reshape(h_ref.shape).astype(float)
+    shade[shade == 0] = np.nan
+
+    for case_dir, ax, color in zip(case_dirs, axes, COLORS):
+        with open_mima_output(get_paths(case_dir), 16) as ds:
+            ds = ds.sel(lat=slice(-5, 5))
+            Y_model = ds['gwfu_cgwd'].values
+            Y_model = Y_model.transpose(0, 2, 3, 1)
+            Y_model = Y_model.reshape(-1, 40)
+
+            idx = np.random.permutation(Y_model.shape[0])[:n_samples]
+            Y_model = Y_model[idx]
+
+            x, y = pca.transform(standardize(Y_model, means, stds)[0]).T
+            ax.scatter(x, y, s=5, c=color, alpha=0.3, linewidth=0, zorder=10)
+    
+        ax.pcolormesh(
+            x_edges, y_edges, shade.T,
+            vmin=0, vmax=4, cmap='Greys',
+            zorder=5
+        )
+
+        ax.set_xlim(-amax, amax)
+        ax.set_ylim(-amax, amax)
+
+        ax.set_xticks(ticks)
+        ax.set_yticks(ticks)
+        
+        ax.set_xlabel('PC1')
+        ax.set_ylabel('PC2')
+
+        name = format_name(case_dir, True)
+        name = name[:name.index(' (')]
+        ax.set_title(name)
+
+    plt.tight_layout()
+    plt.savefig(output_path)
 
 def plot_R2_scores(
     data_dir: str,
@@ -34,6 +118,9 @@ def plot_R2_scores(
 
     X_tr, Y_tr_df = load_datasets(data_dir, 'tr', n_samples)
     X_te, Y_te_df = load_datasets(data_dir, 'te', n_samples)
+
+    # X_tr, Y_tr_df = load_datasets(data_dir, 'te', n_samples, phase='west')
+    # X_te, Y_te_df = load_datasets(data_dir, 'te', n_samples, phase='east')
     Y_tr, Y_te = Y_tr_df.to_numpy(), Y_te_df.to_numpy()
 
     lats = np.linspace(-90, 90, len(X_tr['latitude'].unique()))
@@ -62,6 +149,9 @@ def plot_R2_scores(
 
     axes[1].plot([], [], color='gray', ls='dashed', label='training')
     axes[1].plot([], [], color='gray', label='test')
+
+    # axes[1].plot([], [], color='gray', ls='dashed', label='QBOW')
+    # axes[1].plot([], [], color='gray', label='QBOE')
     axes[1].legend()
 
     plt.savefig(output_path)
@@ -78,7 +168,8 @@ def _configure_lat_axis(ax: Axes) -> None:
     
     lats = np.linspace(-90, 90, 7)
     labels = list(map(format_latitude, lats))
-    scores = [0.2, 0.4, 0.6, 0.8, 1]
+    # scores = [0.2, 0.4, 0.6, 0.8, 1]
+    scores = [0.6, 0.7, 0.8, 0.9, 1]
 
     ax.set_xticks(lats)
     ax.set_xticklabels(labels, rotation=45)

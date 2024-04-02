@@ -6,6 +6,7 @@ from .offline import (
     plot_example_profiles,
     plot_example_sources,
     plot_feature_importances,
+    plot_emulator_drift,
     plot_R2_scores,
     plot_shapley_errors,
     plot_scalar_importances,
@@ -14,6 +15,8 @@ from .offline import (
 from .online import (
     initialize_coupled_run,
     plot_biases,
+    plot_tropical_analysis,
+    plot_pca_shift,
     plot_qbos,
     plot_qbo_statistics,
     plot_ssw_frequencies
@@ -35,6 +38,7 @@ if __name__ == '__main__':
         train_emulator,
         plot_example_profiles,
         plot_example_sources,
+        plot_emulator_drift,
         plot_R2_scores,
         save_shapley_values,
         plot_feature_importances,
@@ -42,6 +46,8 @@ if __name__ == '__main__':
         plot_shapley_errors,
         initialize_coupled_run,
         plot_biases,
+        plot_tropical_analysis,
+        plot_pca_shift,
         plot_qbos,
         plot_qbo_statistics,
         plot_ssw_frequencies,

@@ -36,7 +36,7 @@ def get_qbo_statistics(u: xr.DataArray) -> tuple[float, float, float, float]:
 
     return period, period_err, amp, amp_err
 
-def load_qbo(case_dir: str) -> xr.DataArray:
+def load_qbo(case_dir: str, var='u_gwf') -> xr.DataArray:
     """
     Load the QBO wind from a MiMA run.
 
@@ -47,15 +47,24 @@ def load_qbo(case_dir: str) -> xr.DataArray:
     Returns
     -------
     u : DataArray of QBO (tropical zonal mean) winds.
+    var : Name of variable to return.
 
     """
 
     path = os.path.join(case_dir, 'zonal_mean.nc')
     with open_mima_output(path, n_years=56) as ds:
-        u = ds['u_gwf'].sel(
+        u = ds[var].sel(
             pfull=slice(None, 115),
             lat=slice(-5, 5)
         ).mean(('lat', 'lon'))
+
+    deltas = (u['time'] - u['time'][0]).values
+    seconds = deltas / np.timedelta64(1, 's')
+    u['time'] = seconds / (60 * 60 * 24)
+    u = u.interp(time=np.arange(0, u['time'].max()))
+
+    if var.startswith('gwf'):
+        u = u * 86400
 
     return u.load()
 
